@@ -52,8 +52,8 @@ namespace leandb
 
         class RecordFormatter : IRecord
         {
-            private Stack blockList;
-            public Stack BlockList
+            private Stack<uint> blockList;
+            public Stack<uint> BlockList
             {
                 get{return blockList;}
                 set{blockList = value;}
@@ -63,7 +63,7 @@ namespace leandb
             private int blockSize;
             public int BlockSize { get => blockSize;}
 
-            BlockRW blockFormatter;
+            BlockRW brw;
 
             public void Free(uint index)
             {
@@ -72,18 +72,61 @@ namespace leandb
 
             public void Read(Stream outp, uint index)
             {
-                
-
+                //Keep reading till next = 0
+                uint next = index;
+                while(next != 0)
+                {
+                    Seek(index);
+                    next = brw.Read(outp);
+                }
             }
 
-            public void Write(Stream stream, uint index)
+            public void Write(Stream stream)
             {
-                throw new NotImplementedException();
+                uint pos = blockList.Pop();
+                uint next = 0;
+                do
+                {
+                    using (MemoryStream ts = new MemoryStream())
+                    {
+                        uint cont = brw.Write(stream,ts);
+                        ts.Seek(0,SeekOrigin.Begin);
+                        
+                        using (BinaryWriter bw = new BinaryWriter(dataStream))
+                        {
+                            if(stream.Position < stream.Length-1)
+                            {
+                                next = blockList.Pop();
+                            }
+                            bw.Write(next);
+                            bw.Write(cont);
+                        }
+                        Seek(pos);
+                        ts.CopyTo(dataStream);
+                        pos = next;
+                    }
+                } while(next != 0);
+            }
+
+            private void Seek(uint index)
+            {
+                dataStream.Seek(index * blockSize, SeekOrigin.Begin);
+            }
+
+            private void Link(uint pos, uint next, uint contiguos)
+            {
+                Seek(pos);
+                using (BinaryWriter bw = new BinaryWriter(dataStream))
+                {
+                    bw.Write(next);
+                    bw.Write(contiguos);
+                }
             }
 
             public RecordFormatter(int blockSize)
             {
                 this.blockSize = blockSize;
+                brw = new BlockRW(blockSize, dataStream),
             }
         }
 

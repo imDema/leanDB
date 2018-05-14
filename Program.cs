@@ -37,8 +37,8 @@ namespace leandb
     {
         Stream DataStream{get;set;}
         int BlockSize{get;}
-        Stack BlockList{get;set;}
-        void Write(Stream stream, uint index);
+        Stack<uint> BlockList{get;set;}
+        void Write(Stream stream);
         void Read(Stream outp, uint index);
         void Free(uint index);
     }
@@ -48,12 +48,12 @@ namespace leandb
     public class BlockRW
     {
         int BlockSize;
-        int HeaderSize = sizeof(int)*2;
+        int HeaderSize = sizeof(int)*2 + sizeof(bool);
         int ContentSize;
 
         Stream DataStream;
 
-        void Write(Stream stream, uint index)
+        public void Write(Stream stream, uint index)
         {
 
         }
@@ -63,7 +63,7 @@ namespace leandb
         /// </summary>
         /// <param name="outp">Stream to write to</param>
         /// <param name="inpt">Stream to read from</param>
-        void Read(Stream outp)
+        public uint Read(Stream outp)
         {
             uint next;
             using(BinaryReader br = new BinaryReader(DataStream))
@@ -71,6 +71,10 @@ namespace leandb
                 //First read the header
                 uint contiguos = br.ReadUInt32();
                 next = br.ReadUInt32();
+                bool free = br.ReadBoolean();
+
+                //If landed on free space exit
+                if(free) return 0;
 
                 //Copy the content of the first block
                 byte[] buffer = new byte[ContentSize];
@@ -83,17 +87,7 @@ namespace leandb
                     outp.Write(buffer,0,ContentSize);
                 }
             }
-            //Go to next block and keep reading or stop
-            if(next != 0)
-            {
-                Seek(next);
-                Read(outp);
-            }    
-        }
-
-        private void Seek(uint index)
-        {
-            DataStream.Seek(index * BlockSize, SeekOrigin.Begin);
+            return next;
         }
 
         public BlockRW(int _blockSize, Stream _dataStream)
