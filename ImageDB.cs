@@ -27,6 +27,8 @@ namespace leandb
         {
 
             //1. Serialize the object
+            MemoryStream objStream = new MemoryStream();
+            obj.Serialize(objStream);
 
             //2. Write the record
 
@@ -35,16 +37,68 @@ namespace leandb
 
         }
 
+        class RecordFormatter : IRecord
+        {
+            Stack blockList;
+            BlockFormatter blockFormatter;
+
+            public void Free(uint index)
+            {
+                throw new NotImplementedException();
+            }
+
+            public void Read(Stream outp, uint index)
+            {
+                throw new NotImplementedException();
+            }
+
+            public void Write(Stream stream, uint index)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
         public void Update(ILeanDBObject obj)
         {
             throw new NotImplementedException();
         }
     }
 
-    public interface ILeanDBObject
+    class BlockFormatter : IBlock
     {
-        Guid GetGuid();
+        Stream DataStream;
+        uint BlockSize; 
+
+        public void Read(Stream outp, uint index)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Write(Stream stream, uint index)
+        {
+            throw new NotImplementedException();
+        }
+        
+        public BlockFormatter(Stream dataStream, uint blockSize)
+        {
+            DataStream = dataStream;
+            BlockSize = blockSize;
+        }
     }
+
+    class HashBlockDictionary : Hashtable
+    {
+        public void Add(object key, uint value)
+        {
+            //Leggi la lista esistente con chieve 'key', se è nulla list = nuova lista vuota
+            List<uint> list = this[key] as List<uint> ?? new List<uint>();
+
+            //Aggiungi alla lista e salva nella table
+            list.Add(value);
+            this[key] = list;
+        }
+    }
+
 
     [Serializable]
     class Image : ILeanDBObject
@@ -55,10 +109,11 @@ namespace leandb
         public uint likes;
         public uint dislikes;
 
-        public string path;
+        public string imgid;
         public string user;
         public List<string> tags;
 
+        
         public void Serialize(Stream outp)
         {
             BinaryFormatter bf = new BinaryFormatter();
@@ -73,7 +128,7 @@ namespace leandb
                 guid = tmp.GetGuid();
                 likes = tmp.likes;
                 dislikes = tmp.dislikes;
-                path = tmp.path;
+                imgid = tmp.imgid;
                 tags = tmp.tags;
             }
         }

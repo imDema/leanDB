@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 
 namespace leandb
 {
@@ -12,6 +13,12 @@ namespace leandb
         }
     }
 
+    public interface ILeanDBObject
+    {
+        Guid GetGuid();
+        void Serialize(Stream outp);
+        void Deserialize(Stream inpt);
+    }
     public interface ILeanDB
     {
         
@@ -21,27 +28,16 @@ namespace leandb
         ILeanDBObject Find<T> (T property);
     }
 
-    class HashBlockDictionary : Hashtable
+    public interface IRecord
     {
-        public void Add(object key, uint value)
-        {
-            //Leggi la lista esistente con chieve 'key', se è nulla list = nuova lista vuota
-            List<uint> list = this[key] as List<uint> ?? new List<uint>();
-
-            //Aggiungi alla lista e salva nella table
-            list.Add(value);
-            this[key] = list;
-        }
+        void Write(Stream stream, uint index);
+        void Read(Stream outp, uint index);
+        void Free(uint index);
     }
 
-    public interface IBlockStorage
+    public interface IBlock
     {
-
-    }
-
-
-    public interface ILeanDBObject
-    {
-
+        void Write(Stream stream, uint index);
+        void Read(Stream outp, uint index);
     }
 }
