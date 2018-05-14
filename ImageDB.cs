@@ -113,23 +113,51 @@ namespace leandb
         public string user;
         public List<string> tags;
 
-        
+        /// <summary>
+        /// Serialize this item to the output stream
+        /// </summary>
+        /// <param name="outp">Stream to serialize to</param>
         public void Serialize(Stream outp)
         {
-            BinaryFormatter bf = new BinaryFormatter();
-            bf.Serialize(outp, this);
+            using (BinaryWriter bw = new BinaryWriter(outp))
+            {
+                bw.Write(guid.ToByteArray());
+
+                bw.Write(likes);
+                bw.Write(dislikes);
+
+                bw.Write(imgid);
+                bw.Write(user);
+
+                bw.Write(tags.Count);
+                foreach (string str in tags)
+                {
+                    bw.Write(str);
+                }
+            }
         }
+        /// <summary>
+        /// Deserialize the provided stream to this Image
+        /// </summary>
+        /// <param name="inpt">Stream to deserialize from</param>
         public void Deserialize(Stream inpt)
         {
-            BinaryFormatter bf = new BinaryFormatter();
-            Image tmp = bf.Deserialize(inpt) as Image;
-            if(tmp != null)
+            using (BinaryReader br = new BinaryReader(inpt))
             {
-                guid = tmp.GetGuid();
-                likes = tmp.likes;
-                dislikes = tmp.dislikes;
-                imgid = tmp.imgid;
-                tags = tmp.tags;
+                guid = new Guid(br.ReadBytes(16)); //sizeof(Guid)
+
+                likes = br.ReadUInt32();
+                dislikes = br.ReadUInt32();
+
+                imgid = br.ReadString();
+                user = br.ReadString();
+
+                tags = new List<string>();
+                int tagCount = br.ReadInt32();
+                for (int i = 0; i < tagCount; i++)
+                {
+                    tags.Add(br.ReadString());
+                }
             }
         }
 
