@@ -13,6 +13,19 @@ namespace leandb
         HashBlockDictionary IndexUser = new HashBlockDictionary();
         HashBlockDictionary IndexTag = new HashBlockDictionary();
 
+        private int blockSize = 128;
+        public int BlockSize
+        {
+            get { return blockSize;}
+        }
+        private string path;
+        public string Path
+        {
+            get { return path;}
+            set { path = value;}
+        }
+        RecordFormatter record;
+
         public void Delete(ILeanDBObject obj)
         {
             throw new NotImplementedException();
@@ -31,7 +44,7 @@ namespace leandb
             obj.Serialize(objStream);
 
             //2. Write the record
-
+            
             //3. Index the item in the hashtables
 
 
@@ -39,8 +52,18 @@ namespace leandb
 
         class RecordFormatter : IRecord
         {
-            Stack blockList;
-            BlockFormatter blockFormatter;
+            private Stack blockList;
+            public Stack BlockList
+            {
+                get{return blockList;}
+                set{blockList = value;}
+            }
+            private Stream dataStream;
+            public Stream DataStream { get => dataStream; set => dataStream = value; }
+            private int blockSize;
+            public int BlockSize { get => blockSize;}
+
+            BlockRW blockFormatter;
 
             public void Free(uint index)
             {
@@ -49,40 +72,24 @@ namespace leandb
 
             public void Read(Stream outp, uint index)
             {
-                throw new NotImplementedException();
+                
+
             }
 
             public void Write(Stream stream, uint index)
             {
                 throw new NotImplementedException();
             }
+
+            public RecordFormatter(int blockSize)
+            {
+                this.blockSize = blockSize;
+            }
         }
 
         public void Update(ILeanDBObject obj)
         {
             throw new NotImplementedException();
-        }
-    }
-
-    class BlockFormatter : IBlock
-    {
-        Stream DataStream;
-        uint BlockSize; 
-
-        public void Read(Stream outp, uint index)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Write(Stream stream, uint index)
-        {
-            throw new NotImplementedException();
-        }
-        
-        public BlockFormatter(Stream dataStream, uint blockSize)
-        {
-            DataStream = dataStream;
-            BlockSize = blockSize;
         }
     }
 
