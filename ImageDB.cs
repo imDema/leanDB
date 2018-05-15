@@ -7,12 +7,12 @@ using System.IO;
 
 namespace leandb
 {
-    class ImageDB : ILeanDB
+    class ImageDB : ILeanDB<Image>
     {
         Dictionary<Guid,int> indexGuid;
         public Dictionary<Guid,int> IndexGuid {get => indexGuid; }
-        Indexer<string> IndexUser = new Indexer<string>();
-        Indexer<string> IndexTag = new Indexer<string>();
+        Indexer<string> indexUser = new Indexer<string>();
+        Indexer<string> indexTag = new Indexer<string>();
 
         private string path;
         public string Path
@@ -23,7 +23,7 @@ namespace leandb
         IRecord record;
         public IRecord RecordHandler { get  {return record;}}
 
-        public void Remove(ILeanDBObject obj)
+        public void Remove(Image obj)
         {
             Remove(obj.Guid);
         }
@@ -33,12 +33,19 @@ namespace leandb
         }
 
 
-        public ILeanDBObject Find(Guid guid)
+        public Image Find(Guid guid)
         {
-            throw new NotImplementedException();
+            int index = indexGuid[guid];
+            Image img;
+            using (MemoryStream ms = new MemoryStream())
+            {
+                record.Read(ms, index);
+                img = new Image(ms);
+            }
+            return img;
         }
 
-        public void Insert(ILeanDBObject obj)
+        public void Insert(Image obj)
         {
             int index;
             //1. Serialize the object
@@ -49,8 +56,12 @@ namespace leandb
                 index = record.Write(objStream);
             }
             //3. Index the item in the hashtables
-
-
+            indexGuid.Add(obj.Guid, index);
+            indexUser.Add(obj.user, index);
+            foreach (string tag in obj.tags)
+            {
+                indexTag.Add(tag, index);
+            }
         }
 
         class RecordFormatter : IRecord
@@ -82,12 +93,14 @@ namespace leandb
 
             public void Read(Stream outp, int index)
             {
+                outp.Position = 0;
                 //Keep reading till next = 0
                 int next = index;
                 while(next != 0)
                 {
                     next = brw.Read(outp, next);
                 }
+                outp.Position = 0;
             }
             /// <summary>
             /// Get the index of free blocks from the block list and use IBlock.Write() until the provided stream is exhausted
@@ -136,7 +149,7 @@ namespace leandb
             }
         }
 
-        public void Update(ILeanDBObject obj)
+        public void Update(Image obj)
         {
             throw new NotImplementedException();
         }
