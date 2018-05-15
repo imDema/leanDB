@@ -23,9 +23,9 @@ namespace leandb
     /// </summary>
     public interface ILeanDB
     {
-        int BlockSize{get;}
         string Path{get; set;}
         IRecord RecordHandler{get;}
+        Dictionary<Guid,int> IndexGuid{get;}
         /// <summary>
         /// Use record to insert the object in the database and index it
         /// </summary>
