@@ -25,6 +25,7 @@ namespace leandb
             set { path = value;}
         }
         RecordFormatter record;
+        public IRecord RecordHandler { get  {return record;}}
 
         public void Delete(ILeanDBObject obj)
         {
@@ -80,7 +81,10 @@ namespace leandb
                     next = brw.Read(outp);
                 }
             }
-
+            /// <summary>
+            /// Get the index of free blocks from the block list and use IBlock.Write() until the provided stream is exhausted
+            /// </summary>
+            /// <param name="stream"></param>
             public void Write(Stream stream)
             {
                 uint pos = blockList.Pop();

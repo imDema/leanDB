@@ -25,6 +25,7 @@ namespace leandb
     {
         int BlockSize{get;}
         string Path{get; set;}
+        IRecord RecordHandler{get;}
         void Insert (ILeanDBObject obj);
         void Delete (ILeanDBObject obj);
         void Update (ILeanDBObject obj);
@@ -38,8 +39,21 @@ namespace leandb
         Stream DataStream{get;set;}
         int BlockSize{get;}
         Stack<uint> BlockList{get;set;}
+        /// <summary>
+        /// Write data to free blocks listed in the Blocklist
+        /// </summary>
+        /// <param name="stream">Data to write to blocks</param>
         void Write(Stream stream);
+        /// <summary>
+        /// Read data from continuous and linked blocks
+        /// </summary>
+        /// <param name="outp"></param>
+        /// <param name="index"></param>
         void Read(Stream outp, uint index);
+        /// <summary>
+        /// Set block and linked + contiguous as free and push them to the stack
+        /// </summary>
+        /// <param name="index"></param>
         void Free(uint index);
     }
     /// <summary>
@@ -52,8 +66,12 @@ namespace leandb
         int ContentSize;
 
         Stream DataStream;
-
-        public void Write(Stream stream, uint index)
+        /// <summary>
+        /// Write to contiguous blocks and return the number of blocks after the first
+        /// </summary>
+        /// <param name="stream"></param>
+        /// <returns></returns>
+        public uint Write(Stream stream, MemoryStream tempoutp)
         {
 
         }
@@ -69,25 +87,39 @@ namespace leandb
             using(BinaryReader br = new BinaryReader(DataStream))
             {
                 //First read the header
-                uint contiguos = br.ReadUInt32();
                 next = br.ReadUInt32();
-                bool free = br.ReadBoolean();
+                uint contiguous = br.ReadUInt32();
+                bool active = br.ReadBoolean();
 
-                //If landed on free space exit
-                if(free) return 0;
+                //If landed on inactive space exit
+                if(!active) return 0;
 
                 //Copy the content of the first block
                 byte[] buffer = new byte[ContentSize];
                 DataStream.Read(buffer,0,ContentSize);
                 outp.Write(buffer,0,ContentSize);
-                //Read contiguos blocks
-                for (int i=0; i<contiguos; i++)
+                //Read contiguous blocks
+                for (int i=0; i<contiguous; i++)
                 {
                     DataStream.Read(buffer, HeaderSize, ContentSize);
                     outp.Write(buffer,0,ContentSize);
                 }
             }
             return next;
+        }
+
+        uint FreeBlock()
+        {
+            long Beginning = DataStream.Position;
+            using (BinaryReader br = new BinaryReader(DataStream))
+            {
+                uint next = br.ReadUInt32();
+                uint cont = br.ReadUInt32();
+                DataStream.Seek(Beginning, SeekOrigin.Begin);
+                byte[] deletebuffer = new byte[HeaderSize];
+                DataStream.Write(deletebuffer,0,0);
+                DataStream.Write(deletebuffer, ContentSize,cont);
+            }
         }
 
         public BlockRW(int _blockSize, Stream _dataStream)
