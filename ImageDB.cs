@@ -24,7 +24,7 @@ namespace leandb
             get { return path;}
             set { path = value;}
         }
-        RecordFormatter record;
+        IRecord record;
         public IRecord RecordHandler { get  {return record;}}
 
         public void Delete(ILeanDBObject obj)
@@ -39,13 +39,14 @@ namespace leandb
 
         public void Insert(ILeanDBObject obj)
         {
-
+            int index;
             //1. Serialize the object
-            MemoryStream objStream = new MemoryStream();
-            obj.Serialize(objStream);
-
-            //2. Write the record
-            
+            using(MemoryStream objStream = new MemoryStream())
+            {
+                obj.Serialize(objStream);
+                //2. Write to the IRecord
+                index = record.Write(objStream);
+            }
             //3. Index the item in the hashtables
 
 
@@ -64,11 +65,18 @@ namespace leandb
             private int blockSize;
             public int BlockSize { get => blockSize;}
 
-            BlockRW brw;
+            IBlock brw;
+            public IBlock BlockStructure{get{return brw;}}
 
             public void Free(int index)
             {
-                throw new NotImplementedException();
+                do
+                {
+                    Tuple<int,int> freed;
+                    index = BlockStructure.FreeBlocks(index, out freed);
+                    blockList.Push(freed);
+                }
+                while(index != 0);
             }
 
             public void Read(Stream outp, int index)
@@ -84,7 +92,7 @@ namespace leandb
             /// Get the index of free blocks from the block list and use IBlock.Write() until the provided stream is exhausted
             /// </summary>
             /// <param name="stream"></param>
-            public void Write(Stream stream)
+            public int Write(Stream stream)
             {
                 Tuple<int,int> pos = blockList.Pop();
                 Tuple<int,int> blockRemains = writeSub(stream,pos);
@@ -92,6 +100,7 @@ namespace leandb
                 {
                     blockList.Push(blockRemains);
                 }
+                return pos.Item1;
             }
             /// <summary>
             /// Recursively write on first free group until all the data has been written
@@ -122,7 +131,7 @@ namespace leandb
             public RecordFormatter(int blockSize)
             {
                 this.blockSize = blockSize;
-                brw = new BlockRW(blockSize, dataStream),
+                brw = new BlockRW(blockSize, dataStream);
             }
         }
 
@@ -134,11 +143,13 @@ namespace leandb
 
     public class BlockRW : IBlock
     {
-        int BlockSize;
-        int HeaderSize = sizeof(int)*2 + sizeof(bool);
-        int contentSize;
-        public int ContentSize{get{return contentSize;}}
+        int blockSize;
+        public int BlockSize{get => blockSize;}
 
+        private int headerSize = sizeof(int) * 2 + sizeof(bool);
+        public int HeaderSize { get => headerSize; }
+
+        public int ContentSize{get => blockSize - headerSize;}
         Stream dataStream;
         /// <summary>
         /// Write cont blocks from stream to DataStream, starting from index and linking next in the header
@@ -150,7 +161,7 @@ namespace leandb
         public void Write(Stream stream, int next, int cont, int index)
         {
             byte[] buffer = new byte[ContentSize];
-            using(MemoryStream ms = new MemoryStream(BlockSize*cont))
+            using(MemoryStream ms = new MemoryStream(blockSize*cont))
             {
                 using (BinaryWriter bw = new BinaryWriter(ms))
                 {
@@ -191,39 +202,44 @@ namespace leandb
             if(!active) throw new Exception($"While reading at index {index} (DataStream.Position = {dataStream.Position}) landed on inactive block!");
 
             //Copy the content of the first block group one at a time
-            byte[] buffer = new byte[contentSize];
+            byte[] buffer = new byte[ContentSize];
             for (int i = 0; i < cont; i++)
             {
-                dataStream.Read(buffer,0,contentSize);
-                outp.Write(buffer,0,contentSize);
+                dataStream.Read(buffer,0,ContentSize);
+                outp.Write(buffer,0,ContentSize);
                 dataStream.Position += HeaderSize;
             }
             return next;
         }
 
-        int FreeBlock()
+        public int FreeBlocks(int index, out Tuple<int,int> freed)
         {
-            long Beginning = dataStream.Position;
+            Seek(index);
+            int next, cont;
             using (BinaryReader br = new BinaryReader(dataStream))
             {
-                int next = br.ReadInt32();
-                int cont = br.ReadInt32();
-                dataStream.Seek(Beginning, SeekOrigin.Begin);
-                byte[] deletebuffer = new byte[HeaderSize];
-                dataStream.Write(deletebuffer,0,0);
-                dataStream.Write(deletebuffer, contentSize,cont);
+                next = br.ReadInt32();
+                cont = br.ReadInt32();
             }
+            Seek(index);
+            byte[] deletebuffer = new byte[HeaderSize];
+            for(int i = 0; i<cont; i++)
+            {
+                dataStream.Write(deletebuffer,0,HeaderSize);
+                dataStream.Position += ContentSize;
+            }
+            freed = new Tuple<int,int>(index, cont);
+            return next;
         }
 
         private void Seek(int index)
         {
-            dataStream.Position = index * BlockSize;
+            dataStream.Position = index * blockSize;
         }
 
         public BlockRW(int _blockSize, Stream _dataStream)
         {
-            BlockSize = _blockSize;
-            contentSize = BlockSize - HeaderSize;
+            blockSize = _blockSize;
             dataStream = _dataStream;
         }
     }
@@ -259,6 +275,7 @@ namespace leandb
         /// <param name="outp">Stream to serialize to</param>
         public void Serialize(Stream outp)
         {
+            outp.Position = 0;
             using (BinaryWriter bw = new BinaryWriter(outp))
             {
                 bw.Write(guid.ToByteArray());
@@ -275,6 +292,7 @@ namespace leandb
                     bw.Write(str);
                 }
             }
+            outp.Position = 0;
         }
         /// <summary>
         /// Deserialize the provided stream to this Image

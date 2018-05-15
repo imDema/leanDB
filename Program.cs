@@ -42,11 +42,13 @@ namespace leandb
         /// Tuple contains index and continuous free space
         /// </summary>
         Stack<Tuple<int,int>> BlockList{get;set;}
+        IBlock BlockStructure{get;}
         /// <summary>
         /// Write data to free blocks listed in the Blocklist
         /// </summary>
         /// <param name="stream">Data to write to blocks</param>
-        void Write(Stream stream);
+        /// <returns>Returns index where the item was stored</returns>
+        int Write(Stream stream);
         /// <summary>
         /// Read data from continuous and linked blocks
         /// </summary>
@@ -64,13 +66,26 @@ namespace leandb
     /// </summary>
     public interface IBlock
     {
-        void Write(Stream stream);
-        int Read(Stream outp);
+        /// <summary>
+        /// Write data to sequential blocks starting at index
+        /// </summary>
+        /// <param name="stream">Data to write</param>
+        /// <param name="next">Index of next block</param>
+        /// <param name="cont">Number of blocks to write</param>
+        /// <param name="index">Index of starting block</param>
+        void Write(Stream stream, int next, int cont, int index);
+        /// <summary>
+        /// Read data starting from index and return the next block sequence index
+        /// </summary>
+        /// <param name="outp">Stream were the  read data is written</param>
+        /// <param name="index">Index of the first block to read</param>
+        /// <returns>Returns the index of the linked block sequence</returns>
+        int Read(Stream outp, int index);
 
         /// <summary>
         /// Set contiguous blocks as free
         /// </summary>
         /// <returns>Returns header "next" parameter</returns>
-        int FreeBlocks();
+        int FreeBlocks(int index);
     }
 }
