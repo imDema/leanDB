@@ -53,8 +53,8 @@ namespace leandb
 
         class RecordFormatter : IRecord
         {
-            private Stack<uint> blockList;
-            public Stack<uint> BlockList
+            private Stack<Tuple<int,int>> blockList;
+            public Stack<Tuple<int,int>> BlockList
             {
                 get{return blockList;}
                 set{blockList = value;}
@@ -66,19 +66,18 @@ namespace leandb
 
             BlockRW brw;
 
-            public void Free(uint index)
+            public void Free(int index)
             {
                 throw new NotImplementedException();
             }
 
-            public void Read(Stream outp, uint index)
+            public void Read(Stream outp, int index)
             {
                 //Keep reading till next = 0
-                uint next = index;
+                int next = index;
                 while(next != 0)
                 {
-                    Seek(index);
-                    next = brw.Read(outp);
+                    next = brw.Read(outp, next);
                 }
             }
             /// <summary>
@@ -87,43 +86,36 @@ namespace leandb
             /// <param name="stream"></param>
             public void Write(Stream stream)
             {
-                uint pos = blockList.Pop();
-                uint next = 0;
-                do
+                Tuple<int,int> pos = blockList.Pop();
+                Tuple<int,int> blockRemains = writeSub(stream,pos);
+                if(blockRemains.Item2 > 0)
                 {
-                    using (MemoryStream ts = new MemoryStream())
-                    {
-                        uint cont = brw.Write(stream,ts);
-                        ts.Seek(0,SeekOrigin.Begin);
-                        
-                        using (BinaryWriter bw = new BinaryWriter(dataStream))
-                        {
-                            if(stream.Position < stream.Length-1)
-                            {
-                                next = blockList.Pop();
-                            }
-                            bw.Write(next);
-                            bw.Write(cont);
-                        }
-                        Seek(pos);
-                        ts.CopyTo(dataStream);
-                        pos = next;
-                    }
-                } while(next != 0);
+                    blockList.Push(blockRemains);
+                }
             }
-
-            private void Seek(uint index)
-            {
-                dataStream.Seek(index * blockSize, SeekOrigin.Begin);
-            }
-
-            private void Link(uint pos, uint next, uint contiguos)
-            {
-                Seek(pos);
-                using (BinaryWriter bw = new BinaryWriter(dataStream))
+            /// <summary>
+            /// Recursively write on first free group until all the data has been written
+            /// </summary>
+            /// <param name="stream">Data to write</param>
+            /// <param name="blockpos">Position of the starting block group</param>
+            /// <returns>A Tuple containing the remains of the last group (Item1 : Index, Item2 : Number of unused elements)</returns>
+            private Tuple<int,int> writeSub(Stream stream, Tuple<int,int> blockpos)
+            { 
+                //Calculate if first block group is enough for the stream
+                int left = Convert.ToInt32(stream.Length - stream.Position-1);
+                int nblocks = left % brw.ContentSize > 0 ? left/brw.ContentSize + 1 : left/brw.ContentSize;
+                //If it is write and return what's remaining of the block group
+                if(blockpos.Item2 >= nblocks)
                 {
-                    bw.Write(next);
-                    bw.Write(contiguos);
+                    brw.Write(stream, 0,  nblocks, blockpos.Item1);
+                    return new Tuple<int,int>(blockpos.Item1 + nblocks, blockpos.Item2 - nblocks);
+                }
+                //If it's not enough get a new block group, write, link to the next one and 'recurse'
+                else
+                {
+                    Tuple<int,int> next = blockList.Pop();
+                    brw.Write(stream, next.Item1, blockpos.Item2, blockpos.Item1);
+                    return writeSub(stream, next);
                 }
             }
 
@@ -140,12 +132,108 @@ namespace leandb
         }
     }
 
+    public class BlockRW : IBlock
+    {
+        int BlockSize;
+        int HeaderSize = sizeof(int)*2 + sizeof(bool);
+        int contentSize;
+        public int ContentSize{get{return contentSize;}}
+
+        Stream dataStream;
+        /// <summary>
+        /// Write cont blocks from stream to DataStream, starting from index and linking next in the header
+        /// </summary>
+        /// <param name="stream">Data to write</param>
+        /// <param name="next">Index of the next block to link</param>
+        /// <param name="cont">Number of sequential blocks to write</param>
+        /// <param name="index">Index of the first block to write</param>
+        public void Write(Stream stream, int next, int cont, int index)
+        {
+            byte[] buffer = new byte[ContentSize];
+            using(MemoryStream ms = new MemoryStream(BlockSize*cont))
+            {
+                using (BinaryWriter bw = new BinaryWriter(ms))
+                {
+                    while(cont > 0)
+                    {
+                        bw.Write(next);
+                        bw.Write(cont--);
+                        bw.Write(true); //Mark as active
+                        stream.Read(buffer,0,ContentSize);
+                        bw.Write(buffer);
+                    }
+                }
+                Seek(index);
+                ms.CopyTo(dataStream);
+            }
+        }
+        /// <summary>
+        /// Read block at stream start and follow the headers until finished.
+        /// returns next block or 0 if this is last
+        /// </summary>
+        /// <param name="outp">Stream to write to</param>
+        /// <param name="inpt">Stream to read from</param>
+        public int Read(Stream outp, int index)
+        {
+            int next, cont;
+            bool active;
+            //Go to the index
+            Seek(index);
+            using(BinaryReader br = new BinaryReader(dataStream))
+            {
+                //First read the header
+                next = br.ReadInt32();
+                cont = br.ReadInt32();
+                active = br.ReadBoolean();
+            }
+
+            //If landed on inactive space exit
+            if(!active) throw new Exception($"While reading at index {index} (DataStream.Position = {dataStream.Position}) landed on inactive block!");
+
+            //Copy the content of the first block group one at a time
+            byte[] buffer = new byte[contentSize];
+            for (int i = 0; i < cont; i++)
+            {
+                dataStream.Read(buffer,0,contentSize);
+                outp.Write(buffer,0,contentSize);
+                dataStream.Position += HeaderSize;
+            }
+            return next;
+        }
+
+        int FreeBlock()
+        {
+            long Beginning = dataStream.Position;
+            using (BinaryReader br = new BinaryReader(dataStream))
+            {
+                int next = br.ReadInt32();
+                int cont = br.ReadInt32();
+                dataStream.Seek(Beginning, SeekOrigin.Begin);
+                byte[] deletebuffer = new byte[HeaderSize];
+                dataStream.Write(deletebuffer,0,0);
+                dataStream.Write(deletebuffer, contentSize,cont);
+            }
+        }
+
+        private void Seek(int index)
+        {
+            dataStream.Position = index * BlockSize;
+        }
+
+        public BlockRW(int _blockSize, Stream _dataStream)
+        {
+            BlockSize = _blockSize;
+            contentSize = BlockSize - HeaderSize;
+            dataStream = _dataStream;
+        }
+    }
+
     class HashBlockDictionary : Hashtable
     {
-        public void Add(object key, uint value)
+        public void Add(object key, int value)
         {
             //Leggi la lista esistente con chieve 'key', se è nulla list = nuova lista vuota
-            List<uint> list = this[key] as List<uint> ?? new List<uint>();
+            List<int> list = this[key] as List<int> ?? new List<int>();
 
             //Aggiungi alla lista e salva nella table
             list.Add(value);
@@ -153,15 +241,13 @@ namespace leandb
         }
     }
 
-
-    [Serializable]
     class Image : ILeanDBObject
     {
         private Guid guid = Guid.NewGuid();
         public Guid GetGuid() {return guid; }
 
-        public uint likes;
-        public uint dislikes;
+        public int likes;
+        public int dislikes;
 
         public string imgid;
         public string user;
@@ -200,8 +286,8 @@ namespace leandb
             {
                 guid = new Guid(br.ReadBytes(16)); //sizeof(Guid)
 
-                likes = br.ReadUInt32();
-                dislikes = br.ReadUInt32();
+                likes = br.ReadInt32();
+                dislikes = br.ReadInt32();
 
                 imgid = br.ReadString();
                 user = br.ReadString();
