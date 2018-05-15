@@ -14,7 +14,7 @@ namespace leandb
     }
     public interface ILeanDBObject
     {
-        Guid GetGuid();
+        Guid Guid{get;}
         void Serialize(Stream outp);
         void Deserialize(Stream inpt);
     }
@@ -26,10 +26,23 @@ namespace leandb
         int BlockSize{get;}
         string Path{get; set;}
         IRecord RecordHandler{get;}
+        /// <summary>
+        /// Use record to insert the object in the database and index it
+        /// </summary>
+        /// <param name="obj">Object to insert</param>
         void Insert (ILeanDBObject obj);
-        void Delete (ILeanDBObject obj);
+        /// <summary>
+        /// Remove the object with matching guid from the database
+        /// </summary>
+        /// <param name="guid">Guid of the item to delete</param>
+        void Remove (Guid guid);
         void Update (ILeanDBObject obj);
-        ILeanDBObject Find<T> (T property);
+        /// <summary>
+        /// Lookup an item in the indexes and read from record
+        /// </summary>
+        /// <param name="guid">GUID of the item to retrieve</param>
+        /// <returns></returns>
+        ILeanDBObject Find (Guid guid);
     }
     /// <summary>
     /// Handles block writing, reading and deletion

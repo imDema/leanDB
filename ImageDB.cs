@@ -9,15 +9,11 @@ namespace leandb
 {
     class ImageDB : ILeanDB
     {
-        HashBlockDictionary IndexGuid = new HashBlockDictionary();
-        HashBlockDictionary IndexUser = new HashBlockDictionary();
-        HashBlockDictionary IndexTag = new HashBlockDictionary();
+        Dictionary<Guid,int> indexGuid;
+        public Dictionary<Guid,int> IndexGuid {get => indexGuid; }
+        Indexer<string> IndexUser = new Indexer<string>();
+        Indexer<string> IndexTag = new Indexer<string>();
 
-        private int blockSize = 128;
-        public int BlockSize
-        {
-            get { return blockSize;}
-        }
         private string path;
         public string Path
         {
@@ -27,12 +23,17 @@ namespace leandb
         IRecord record;
         public IRecord RecordHandler { get  {return record;}}
 
-        public void Delete(ILeanDBObject obj)
+        public void Remove(ILeanDBObject obj)
         {
-            throw new NotImplementedException();
+            Remove(obj.Guid);
+        }
+        public void Remove(Guid guid)
+        {
+            record.Free(indexGuid[guid]);
         }
 
-        public ILeanDBObject Find<T>(T property)
+
+        public ILeanDBObject Find(Guid guid)
         {
             throw new NotImplementedException();
         }
@@ -244,9 +245,9 @@ namespace leandb
         }
     }
 
-    class HashBlockDictionary : Hashtable
+    class Indexer<T> : Dictionary<T,List<int>>
     {
-        public void Add(object key, int value)
+        public void Add(T key, int value)
         {
             //Leggi la lista esistente con chieve 'key', se è nulla list = nuova lista vuota
             List<int> list = this[key] as List<int> ?? new List<int>();
@@ -255,12 +256,20 @@ namespace leandb
             list.Add(value);
             this[key] = list;
         }
+        public void Remove(T key, int value)
+        {
+            this[key].Remove(value);
+            if(this[key].Count == 0)
+            {
+                this.Remove(key);
+            }
+        }
     }
 
     class Image : ILeanDBObject
     {
         private Guid guid = Guid.NewGuid();
-        public Guid GetGuid() {return guid; }
+        public Guid Guid { get => guid; }
 
         public int likes;
         public int dislikes;
