@@ -23,7 +23,7 @@ namespace leandb
     /// </summary>
     public interface ILeanDB<T>
     {
-        string Path{get; set;}
+        string Path{get;}
         IRecord RecordHandler{get;}
         Dictionary<Guid,int> IndexGuid{get;}
         /// <summary>
@@ -42,7 +42,7 @@ namespace leandb
         /// </summary>
         /// <param name="guid">GUID of the item to retrieve</param>
         /// <returns></returns>
-        T Find (Guid guid);
+        T Select (Guid guid);
     }
     /// <summary>
     /// Handles block writing, reading and deletion

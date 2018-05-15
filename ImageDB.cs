@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace leandb
 {
@@ -18,7 +19,6 @@ namespace leandb
         public string Path
         {
             get { return path;}
-            set { path = value;}
         }
         IRecord record;
         public IRecord RecordHandler { get  {return record;}}
@@ -33,7 +33,7 @@ namespace leandb
         }
 
 
-        public Image Find(Guid guid)
+        public Image Select(Guid guid)
         {
             int index = indexGuid[guid];
             Image img;
@@ -43,6 +43,30 @@ namespace leandb
                 img = new Image(ms);
             }
             return img;
+        }
+        public List<Image> SelectUser(string user)
+        {
+            List<int> indexes = indexUser[user];
+            List<Image> images = new List<Image>();
+            //Parallel
+            Parallel.ForEach(indexes,(index) =>
+            {
+                using(MemoryStream ms = new MemoryStream())
+                {
+                    record.Read(ms, index);
+                    images.Add(new Image(ms));
+                }
+            });
+            //Sequential
+            // foreach(int index in indexes )
+            // {
+            //     using(MemoryStream ms = new MemoryStream())
+            //     {
+            //         record.Read(ms, index);
+            //         images.Add(new Image(ms));
+            //     }
+            // }
+            return images;
         }
 
         public void Insert(Image obj)
