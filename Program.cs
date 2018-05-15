@@ -66,6 +66,10 @@ namespace leandb
     /// </summary>
     public interface IBlock
     {
+        int BlockSize{get;}
+        int HeaderSize{get;}
+        int ContentSize{get;}
+
         /// <summary>
         /// Write data to sequential blocks starting at index
         /// </summary>
@@ -85,7 +89,9 @@ namespace leandb
         /// <summary>
         /// Set contiguous blocks as free
         /// </summary>
+        /// <param name="index">Index of starting block</param>
+        /// <param name="freed">Returns the block sequence marked as free</param>
         /// <returns>Returns header "next" parameter</returns>
-        int FreeBlocks(int index);
+        int FreeBlocks(int index, out Tuple<int,int> freed);
     }
 }
