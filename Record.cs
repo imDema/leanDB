@@ -5,7 +5,7 @@ using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 namespace leandb 
 {
-    class RecordFormatter : IRecord
+    public class RecordFormatter : IRecord
     {
         private Stack<Tuple<int,int>> blockList;
         public Stack<Tuple<int,int>> BlockList
@@ -13,7 +13,7 @@ namespace leandb
             get{return blockList;}
             set{blockList = value;}
         }
-        string blockListPath = "blocks.ldlb";
+        readonly string blockListPath = "blocks.ldlb";
 
         IBlock blockHandler;
         public IBlock BlockStructure{get{return blockHandler;}}
@@ -47,7 +47,7 @@ namespace leandb
         public int Write(Stream stream)
         {
             Tuple<int,int> pos = blockList.Pop();
-            Tuple<int,int> blockRemains = writeSub(stream,pos);
+            Tuple<int,int> blockRemains = WriteSub(stream,pos);
             if(blockRemains.Item2 > 0)
             {
                 blockList.Push(blockRemains);
@@ -58,36 +58,43 @@ namespace leandb
         /// Recursively write on first free group until all the data has been written
         /// </summary>
         /// <param name="stream">Data to write</param>
-        /// <param name="blockpos">Position of the starting block group</param>
+        /// <param name="freeBlocks">Position of the starting block group</param>
         /// <returns>A Tuple containing the remains of the last group (Item1 : Index, Item2 : Number of unused elements)</returns>
-        private Tuple<int,int> writeSub(Stream stream, Tuple<int,int> blockpos)
+        private Tuple<int,int> WriteSub(Stream stream, Tuple<int,int> freeBlocks)
         { 
             //Calculate if first block group is enough for the stream
             int left = Convert.ToInt32(stream.Length - stream.Position-1);
             int nblocks = left % blockHandler.ContentSize > 0 ? left/blockHandler.ContentSize + 1 : left/blockHandler.ContentSize;
-            //If it is write and return what's remaining of the block group
-            if(blockpos.Item2 >= nblocks)
+            //If tail space just write and return new tail index
+            if(freeBlocks.Item2 == -1)
             {
-                blockHandler.Write(stream, 0,  nblocks, blockpos.Item1);
-                return new Tuple<int,int>(blockpos.Item1 + nblocks, blockpos.Item2 - nblocks);
+                blockHandler.Write(stream, 0,  nblocks, freeBlocks.Item1);
+                return new Tuple<int, int>(freeBlocks.Item1 + nblocks, -1);
+            }
+            //If enough there is enough space in the sequence write and return any leftover
+            if(freeBlocks.Item2 >= nblocks)
+            {
+                blockHandler.Write(stream, 0,  nblocks, freeBlocks.Item1);
+                return new Tuple<int,int>(freeBlocks.Item1 + nblocks, freeBlocks.Item2 - nblocks);
             }
             //If it's not enough get a new block group, write, link to the next one and 'recurse'
             else
             {
                 Tuple<int,int> next = blockList.Pop();
-                blockHandler.Write(stream, next.Item1, blockpos.Item2, blockpos.Item1);
-                return writeSub(stream, next);
+                blockHandler.Write(stream, next.Item1, freeBlocks.Item2, freeBlocks.Item1);
+                return WriteSub(stream, next);
             }
         }
 
         private void InitBlockList(string path)
         {
-            if(File.Exists(path + blockListPath))
+            string blPath = Path.Combine(path, blockListPath);
+            if(File.Exists(blPath))
             {
-                using(FileStream fs = File.OpenRead(path+blockListPath))
+                using(FileStream fs = File.OpenRead(blPath))
                 {
                     BinaryFormatter bf = new BinaryFormatter();
-                    blockList = bf.Deserialize(fs) as Stack<Tuple<int,int>> ?? throw new ArgumentNullException($"File {path + blockListPath} does not contain a valid Indexer");
+                    blockList = bf.Deserialize(fs) as Stack<Tuple<int,int>> ?? throw new ArgumentNullException($"File {blPath} does not contain a valid Indexer");
                 }
             }
             else

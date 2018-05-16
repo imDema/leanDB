@@ -9,10 +9,12 @@ namespace leandb
     {
         static void Main(string[] args)
         {
-            string path = "/home/dema/Documents/dotnet/leandbtest/";
+            string path = Path.GetDirectoryName( System.Reflection.Assembly.GetEntryAssembly().Location);
             using(BlockRW Block = new BlockRW(256, path))
             {
-
+                RecordFormatter Record = new RecordFormatter(Block, path);
+                ImageDB Database = new ImageDB(Record, path);
+                Console.WriteLine("Initialized everything!");
             }
         }
     }
@@ -28,7 +30,7 @@ namespace leandb
     /// </summary>
     public interface ILeanDB<T>
     {
-        string Path{get;}
+        string Location{get;}
         IRecord RecordHandler{get;}
         Dictionary<Guid,int> IndexGuid{get;}
         /// <summary>

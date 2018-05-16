@@ -5,10 +5,11 @@ namespace leandb
 
     public class BlockRW : IBlock, IDisposable
     {
-        int blockSize;
+        readonly string dataPath = "data.ldb";
+        readonly int blockSize;
         public int BlockSize{get => blockSize;}
 
-        private int headerSize = sizeof(int) * 2 + sizeof(bool);
+        private readonly int headerSize = sizeof(int) * 2 + sizeof(bool);
         public int HeaderSize { get => headerSize; }
 
         public int ContentSize{get => blockSize - headerSize;}
@@ -73,7 +74,12 @@ namespace leandb
             }
             return next;
         }
-
+        /// <summary>
+        /// Set sequence of block to free
+        /// </summary>
+        /// <param name="index">Index of the first block</param>
+        /// <param name="freed">Returns the leftover blocks</param>
+        /// <returns></returns>
         public int FreeBlocks(int index, out Tuple<int,int> freed)
         {
             Seek(index);
@@ -107,7 +113,7 @@ namespace leandb
         public BlockRW(int _blockSize, string path)
         {
             blockSize = _blockSize;
-            dataStream = File.Open(path,FileMode.OpenOrCreate,FileAccess.ReadWrite);
+            dataStream = File.Open(Path.Combine(path, dataPath),FileMode.OpenOrCreate,FileAccess.ReadWrite);
         }
     }
 }

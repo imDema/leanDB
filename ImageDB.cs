@@ -13,16 +13,18 @@ namespace leandb
         Dictionary<Guid,int> indexGuid;
         public Dictionary<Guid,int> IndexGuid {get => indexGuid; }
         Indexer<string> indexUser = new Indexer<string>();
+        //TODO IMPLEMENT indexDate
         Indexer<string> indexTag = new Indexer<string>();
 
-        private string path;
-        public string Path {get => path;}
+        private string location;
+        public string Location {get => location;}
         IRecord record;
         public IRecord RecordHandler { get  {return record;}}
 
-        private string indexGuidPath = "iguid.ldi";
-        private string indexUserPath = "iuser.ldi";
-        private string indexTagPath = "itag.ldi";
+        private readonly string indexGuidPath = "iguid.ldi";
+        private readonly string indexUserPath = "iuser.ldi";
+        private readonly string indexDatePath = "idate.ldi";
+        private readonly string indexTagPath = "itag.ldi";
 
         public void Remove(Image obj)
         {
@@ -101,9 +103,9 @@ namespace leandb
             Remove(obj);
             Insert(obj);
         }
-        public ImageDB(string path, IRecord record)
+        public ImageDB(IRecord record, string path)
         {
-            this.path = path;
+            this.location = path;
             this.record = record;
             InitIndexes(path);
         }
@@ -111,35 +113,37 @@ namespace leandb
         private void InitIndexes(string path)
         {
             BinaryFormatter bf = new BinaryFormatter();
-            if(File.Exists(path + indexGuidPath))
+            string pathGuid = Path.Combine(path, indexGuidPath);
+            if(File.Exists(pathGuid))
             {
-                using(FileStream fs = File.OpenRead(path+indexGuidPath))
+                using(FileStream fs = File.OpenRead(pathGuid))
                 {
-                    indexGuid = bf.Deserialize(fs) as Dictionary<Guid,int> ?? throw new ArgumentNullException($"File {path + indexGuidPath} does not contain a valid Indexer");
+                    indexGuid = bf.Deserialize(fs) as Dictionary<Guid,int> ?? throw new ArgumentNullException($"File {pathGuid} does not contain a valid Indexer");
                 }
             }
-            else
-                indexGuid = new Dictionary<Guid,int>();
+            else  indexGuid = new Dictionary<Guid,int>();
 
-            if(File.Exists(path + indexUserPath))
+
+            string pathUser = Path.Combine(path, indexUserPath);
+            if (File.Exists(pathUser))
             {
-                using(FileStream fs = File.OpenRead(path+indexUserPath))
+                using(FileStream fs = File.OpenRead(pathUser))
                 {
-                    indexUser = bf.Deserialize(fs) as Indexer<string> ?? throw new ArgumentNullException($"File {path + indexUserPath} does not contain a valid Indexer");
+                    indexUser = bf.Deserialize(fs) as Indexer<string> ?? throw new ArgumentNullException($"File {pathUser} does not contain a valid Indexer");
                 }
             }
-            else
-                indexUser = new Indexer<string>();
-            
-            if(File.Exists(path + indexTagPath))
+            else indexUser = new Indexer<string>();
+
+
+            string pathTag = Path.Combine(path, indexTagPath);
+            if (File.Exists(pathTag))
             {
-                using(FileStream fs = File.OpenRead(path+indexTagPath))
+                using(FileStream fs = File.OpenRead(pathTag))
                 {
-                    indexTag = bf.Deserialize(fs) as Indexer<string> ?? throw new ArgumentNullException($"File {path + indexTagPath} does not contain a valid Indexer");
+                    indexTag = bf.Deserialize(fs) as Indexer<string> ?? throw new ArgumentNullException($"File {pathTag} does not contain a valid Indexer");
                 }
             }
-            else
-                indexTag = new Indexer<string>();
+            else indexTag = new Indexer<string>();
         }
     }
 
@@ -171,9 +175,11 @@ namespace leandb
 
         public int likes;
         public int dislikes;
+        
 
         public string imgid;
         public string user;
+        public DateTime date;
         public List<string> tags;
 
         /// <summary>
@@ -192,6 +198,7 @@ namespace leandb
 
                 bw.Write(imgid);
                 bw.Write(user);
+                bw.Write(date.Ticks);
 
                 bw.Write(tags.Count);
                 foreach (string str in tags)
@@ -216,6 +223,7 @@ namespace leandb
 
                 imgid = br.ReadString();
                 user = br.ReadString();
+                date = new DateTime(br.ReadInt64());
 
                 tags = new List<string>();
                 int tagCount = br.ReadInt32();
