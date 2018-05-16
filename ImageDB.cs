@@ -20,6 +20,10 @@ namespace leandb
         IRecord record;
         public IRecord RecordHandler { get  {return record;}}
 
+        private string indexGuidPath = "iguid.ldi";
+        private string indexUserPath = "iuser.ldi";
+        private string indexTagPath = "itag.ldi";
+
         public void Remove(Image obj)
         {
             Remove(obj.Guid);
@@ -101,6 +105,41 @@ namespace leandb
         {
             this.path = path;
             this.record = record;
+            InitIndexes(path);
+        }
+
+        private void InitIndexes(string path)
+        {
+            BinaryFormatter bf = new BinaryFormatter();
+            if(File.Exists(path + indexGuidPath))
+            {
+                using(FileStream fs = File.OpenRead(path+indexGuidPath))
+                {
+                    indexGuid = bf.Deserialize(fs) as Dictionary<Guid,int> ?? throw new ArgumentNullException($"File {path + indexGuidPath} does not contain a valid Indexer");
+                }
+            }
+            else
+                indexGuid = new Dictionary<Guid,int>();
+
+            if(File.Exists(path + indexUserPath))
+            {
+                using(FileStream fs = File.OpenRead(path+indexUserPath))
+                {
+                    indexUser = bf.Deserialize(fs) as Indexer<string> ?? throw new ArgumentNullException($"File {path + indexUserPath} does not contain a valid Indexer");
+                }
+            }
+            else
+                indexUser = new Indexer<string>();
+            
+            if(File.Exists(path + indexTagPath))
+            {
+                using(FileStream fs = File.OpenRead(path+indexTagPath))
+                {
+                    indexTag = bf.Deserialize(fs) as Indexer<string> ?? throw new ArgumentNullException($"File {path + indexTagPath} does not contain a valid Indexer");
+                }
+            }
+            else
+                indexTag = new Indexer<string>();
         }
     }
 

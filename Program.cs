@@ -9,9 +9,14 @@ namespace leandb
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            string path = "/home/dema/Documents/dotnet/leandbtest/";
+            using(BlockRW Block = new BlockRW(256, path))
+            {
+
+            }
         }
     }
+
     public interface ILeanDBObject
     {
         Guid Guid{get;}
@@ -49,8 +54,6 @@ namespace leandb
     /// </summary>
     public interface IRecord
     {
-        Stream DataStream{get;set;}
-        int BlockSize{get;}
         /// <summary>
         /// Tuple contains index and continuous free space
         /// </summary>
@@ -77,7 +80,7 @@ namespace leandb
     /// <summary>
     /// Blocks of data to be read fully, must be 128*n size for alignment purposes
     /// </summary>
-    public interface IBlock
+    public interface IBlock : IDisposable
     {
         int BlockSize{get;}
         int HeaderSize{get;}

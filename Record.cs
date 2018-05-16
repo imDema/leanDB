@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.Serialization.Formatters.Binary;
 namespace leandb 
 {
     class RecordFormatter : IRecord
@@ -12,13 +13,10 @@ namespace leandb
             get{return blockList;}
             set{blockList = value;}
         }
-        private Stream dataStream;
-        public Stream DataStream { get => dataStream; set => dataStream = value; }
-        private int blockSize;
-        public int BlockSize { get => blockSize;}
+        string blockListPath = "blocks.ldlb";
 
-        IBlock brw;
-        public IBlock BlockStructure{get{return brw;}}
+        IBlock blockHandler;
+        public IBlock BlockStructure{get{return blockHandler;}}
 
         public void Free(int index)
         {
@@ -38,7 +36,7 @@ namespace leandb
             int next = index;
             while(next != 0)
             {
-                next = brw.Read(outp, next);
+                next = blockHandler.Read(outp, next);
             }
             outp.Position = 0;
         }
@@ -66,26 +64,43 @@ namespace leandb
         { 
             //Calculate if first block group is enough for the stream
             int left = Convert.ToInt32(stream.Length - stream.Position-1);
-            int nblocks = left % brw.ContentSize > 0 ? left/brw.ContentSize + 1 : left/brw.ContentSize;
+            int nblocks = left % blockHandler.ContentSize > 0 ? left/blockHandler.ContentSize + 1 : left/blockHandler.ContentSize;
             //If it is write and return what's remaining of the block group
             if(blockpos.Item2 >= nblocks)
             {
-                brw.Write(stream, 0,  nblocks, blockpos.Item1);
+                blockHandler.Write(stream, 0,  nblocks, blockpos.Item1);
                 return new Tuple<int,int>(blockpos.Item1 + nblocks, blockpos.Item2 - nblocks);
             }
             //If it's not enough get a new block group, write, link to the next one and 'recurse'
             else
             {
                 Tuple<int,int> next = blockList.Pop();
-                brw.Write(stream, next.Item1, blockpos.Item2, blockpos.Item1);
+                blockHandler.Write(stream, next.Item1, blockpos.Item2, blockpos.Item1);
                 return writeSub(stream, next);
             }
         }
 
-        public RecordFormatter(int blockSize)
+        private void InitBlockList(string path)
         {
-            this.blockSize = blockSize;
-            brw = new BlockRW(blockSize, dataStream);
+            if(File.Exists(path + blockListPath))
+            {
+                using(FileStream fs = File.OpenRead(path+blockListPath))
+                {
+                    BinaryFormatter bf = new BinaryFormatter();
+                    blockList = bf.Deserialize(fs) as Stack<Tuple<int,int>> ?? throw new ArgumentNullException($"File {path + blockListPath} does not contain a valid Indexer");
+                }
+            }
+            else
+            {
+                blockList = new Stack<Tuple<int,int>>();
+                blockList.Push(new Tuple<int,int>(0,-1));
+            }
+        }
+
+        public RecordFormatter(IBlock blockHandler, string path)
+        {
+            this.blockHandler = blockHandler;
+            InitBlockList(path);
         }
     }
 }

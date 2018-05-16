@@ -3,7 +3,7 @@ using System.IO;
 namespace leandb
 {
 
-    public class BlockRW : IBlock
+    public class BlockRW : IBlock, IDisposable
     {
         int blockSize;
         public int BlockSize{get => blockSize;}
@@ -99,10 +99,15 @@ namespace leandb
             dataStream.Position = index * blockSize;
         }
 
-        public BlockRW(int _blockSize, Stream _dataStream)
+        public void Dispose()
+        {
+            dataStream.Dispose();
+        }
+
+        public BlockRW(int _blockSize, string path)
         {
             blockSize = _blockSize;
-            dataStream = _dataStream;
+            dataStream = File.Open(path,FileMode.OpenOrCreate,FileAccess.ReadWrite);
         }
     }
 }
