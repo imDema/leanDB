@@ -12,9 +12,9 @@ namespace leandb
     {
         Dictionary<Guid,int> indexGuid;
         public Dictionary<Guid,int> IndexGuid {get => indexGuid; }
-        Indexer<string> indexUser = new Indexer<string>();
+        IndexerInt indexUser = new IndexerInt();
         //TODO IMPLEMENT indexDate
-        Indexer<string> indexTag = new Indexer<string>();
+        IndexerString indexTag = new IndexerString();
 
         private string location;
         public string Location {get => location;}
@@ -54,7 +54,7 @@ namespace leandb
             }
             return img;
         }
-        public List<Image> SelectUser(string user)
+        public List<Image> SelectUser(int user)
         {
             List<int> indexes = indexUser[user];
             List<Image> images = new List<Image>();
@@ -109,6 +109,7 @@ namespace leandb
         {
             BinaryFormatter bf = new BinaryFormatter();
             
+            //GUID
             if(File.Exists(GuidIndexLocation))
             {
                 using(FileStream fs = File.OpenRead(GuidIndexLocation))
@@ -118,23 +119,25 @@ namespace leandb
             }
             else  indexGuid = new Dictionary<Guid,int>();
             
+            //USER (INT)
             if (File.Exists(UserIndexLocation))
             {
                 using(FileStream fs = File.OpenRead(UserIndexLocation))
                 {
-                    indexUser = bf.Deserialize(fs) as Indexer<string> ?? throw new ArgumentNullException($"File {UserIndexLocation} does not contain a valid Indexer");
+                    indexUser = new IndexerInt(fs);
                 }
             }
-            else indexUser = new Indexer<string>();
+            else indexUser = new IndexerInt();
 
+            //TAG (STRING)
             if (File.Exists(TagIndexLocation))
             {
                 using(FileStream fs = File.OpenRead(TagIndexLocation))
                 {
-                    indexTag = bf.Deserialize(fs) as Indexer<string> ?? throw new ArgumentNullException($"File {TagIndexLocation} does not contain a valid Indexer");
+                    indexTag = new IndexerString(fs);
                 }
             }
-            else indexTag = new Indexer<string>();
+            else indexTag = new IndexerString();
 
             //TODO IMPLEMENT INDEX DATE
         }
@@ -148,12 +151,12 @@ namespace leandb
 
             using (FileStream fs = File.Open(UserIndexLocation, FileMode.Create, FileAccess.Write))
             {
-                bf.Serialize(fs, indexUser);
+                indexUser.Serialize(fs);
             }
             
             using (FileStream fs = File.Open(TagIndexLocation, FileMode.Create, FileAccess.Write))
             {
-                bf.Serialize(fs, indexTag);
+                indexTag.Serialize(fs);
             }
             
             //using (FileStream fs = File.Open(DateIndexLocation, FileMode.Create, FileAccess.Write))
@@ -180,8 +183,7 @@ namespace leandb
         }
     }
 
-    [Serializable]
-    class Indexer<T> : Dictionary<T,List<int>>, ISerializable
+    abstract class Indexer<T> : Dictionary<T,List<int>>
     {
         public void Add(T key, int value)
         {
@@ -204,6 +206,85 @@ namespace leandb
                 this.Remove(key);
             }
         }
+        public void Serialize(Stream outp)
+        {
+            using (BinaryWriter bw = new BinaryWriter(outp, System.Text.Encoding.UTF8, true))
+            {
+                bw.Write(Count);
+                foreach (KeyValuePair<T, List<int>> item in this)
+                {
+                    //Serialize key
+                    SerializeKey(item, bw);
+                    //Serialize value
+                    WriteList(bw, item.Value);
+                }
+            }
+        }
+        public void Deserialize(Stream inpt)
+        {
+            using (BinaryReader br = new BinaryReader(inpt, System.Text.Encoding.UTF8, true))
+            {
+                int cnt = br.ReadInt32();
+                for (int i = 0; i < cnt; i++)
+                {
+                    //Deserialize key
+                    T key = DeserializeKey(br);
+                    //Deserialize value
+                    List<int> value = new List<int>();
+                    ReadList(value, br);
+                    //Add to dictionary
+                    Add(key, value);
+                }
+            }
+        }
+        internal abstract void SerializeKey(KeyValuePair<T, List<int>> item, BinaryWriter bw);
+        internal abstract T DeserializeKey(BinaryReader br);
+        internal void WriteList(BinaryWriter bw, List<int> list)
+        {
+            bw.Write(list.Count);
+            foreach (int n in list)
+            {
+                bw.Write(n);
+            }
+        }
+        internal void ReadList(List<int> list, BinaryReader br)
+        {
+            for (int i = 0, n = br.ReadInt32(); i < n; i++)
+            {
+                list.Add(br.ReadInt32());
+            }
+        }
+        public Indexer(Stream stream) : base()
+        {
+            Deserialize(stream);
+        }
+        public Indexer() : base() { }
+    }
+    class IndexerInt : Indexer<int>
+    {
+        internal override int DeserializeKey(BinaryReader br)
+        {
+            return br.ReadInt32();
+        }
+        internal override void SerializeKey(KeyValuePair<int, List<int>> item, BinaryWriter bw)
+        {
+            bw.Write(item.Key);
+        }
+        public IndexerInt() : base() { }
+        public IndexerInt(Stream stream) : base(stream) { }
+    }
+    class IndexerString : Indexer<string>
+    {
+        internal override string DeserializeKey(BinaryReader br)
+        {
+            return br.ReadString();
+        }
+        internal override void SerializeKey(KeyValuePair<string, List<int>> item, BinaryWriter bw)
+        {
+            bw.Write(item.Key);
+        }
+        public IndexerString() : base() { }
+        public IndexerString(Stream stream) : base(stream) { }
     }
 
     class Image : ILeanDBObject
@@ -216,7 +297,7 @@ namespace leandb
         
 
         public string imgid;
-        public string user;
+        public int user;
         public DateTime date;
         public List<string> tags;
 
@@ -270,7 +351,7 @@ namespace leandb
                 dislikes = br.ReadInt32();
 
                 imgid = br.ReadString();
-                user = br.ReadString();
+                user = br.ReadInt32();
                 date = new DateTime(br.ReadInt64());
 
                 tags = new List<string>();

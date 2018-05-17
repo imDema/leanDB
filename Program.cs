@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace leandb
 {
@@ -10,53 +11,43 @@ namespace leandb
         static void Main(string[] args)
         {
             string path = Path.GetDirectoryName( System.Reflection.Assembly.GetEntryAssembly().Location);
-            using(BlockRW Block = new BlockRW(256, path))
+            using(BlockRW Block = new BlockRW(128, path))
             {
                 Console.WriteLine("Block handler initialized.");
                 RecordFormatter Record = new RecordFormatter(Block, path);
                 Console.WriteLine("Record handler intitialized.");
                 ImageDB Database = new ImageDB(Record, path);
                 Console.WriteLine("Database initialized.");
-
-                //Testimg
-                Image testimg0 = new Image()
+                Console.Write("\nReady to insert test images\nHow many? ");
+                int n = int.Parse(Console.ReadLine());
+                for (int i = 0; i<n; i++)
                 {
-                    likes = 45,
-                    dislikes = 5,
-                    imgid = "telegram:img47ae5fd47be6b5c74",
-                    user = "a3f65da56bc",
-                    date = new DateTime(2018, 03, 24),
-                    tags = new List<string>(new string[] { "daniele_braga", "trifoglio" })
-                };
-
-                Image testimg1 = new Image()
-                {
-                    likes = 24,
-                    dislikes = 10,
-                    imgid = "telegram:img5658de4c5237d5fe5",
-                    user = "65f97cd68e9",
-                    date = new DateTime(2018, 03, 17),
-                    tags = new List<string>(new string[] { "luca_mauri", "algebra", "test" })
-                };
-
-                Image testimg2 = new Image()
-                {
-                    likes = 103,
-                    dislikes = 25,
-                    imgid = "telegram:img581f57d3c57abe754b",
-                    user = "589c67de6f4",
-                    date = new DateTime(2018, 05, 15),
-                    tags = new List<string>(new string[] { "gruosso_giambattista" })
-                };
-
-                Database.Insert(testimg0);
-                Database.Insert(testimg1);
+                    Database.Insert(GenerateTestImg());
+                }
                 Console.WriteLine("Added test images.");
-                Console.WriteLine("Finding image by GUID test:");
-                Console.WriteLine(Database.Select(testimg1.Guid).ToString());
                 Database.SaveData();
                 Console.WriteLine("Data Saved to files");
             }
+        }
+        static Image GenerateTestImg()
+        {
+            Random random = new Random();
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            string[] tags = { "analisi1", "mauri_luca", "ghilardi_dino", "analisi2", "migliavacca_cristian", "elettrotecnica", "gal", "metrangolo_pierangelo", "internet_e_reti", "bramanti_marco", "trifoglio", "bizzarri_federico", "boella_marco", "chimica", "fisica" };
+            Image img = new Image()
+            {
+                likes = random.Next(0, 250),
+                dislikes = random.Next(0, 200),
+                imgid = new string(Enumerable.Repeat(chars, 64).Select(s => s[random.Next(s.Length)]).ToArray()),
+                user = random.Next(),
+                date = new DateTime(random.Next(2017, 2019), random.Next(1, 12), random.Next(1, 28), random.Next(0, 24), random.Next(0, 60), random.Next(0, 60)),
+                tags = new List<string>()
+            };
+            for(int i = 0, n = random.Next(1,4); i < n; i++)
+            {
+                img.tags.Add(tags[random.Next(0, tags.Length)]);
+            }
+            return img;
         }
     }
 
