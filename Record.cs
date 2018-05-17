@@ -40,7 +40,7 @@ namespace leandb
             outp.Position = 0;
             //Keep reading till next = 0
             int next = index;
-            while(next != 0)
+            while(next != -1)
             {
                 next = blockHandler.Read(outp, next);
             }
@@ -69,18 +69,18 @@ namespace leandb
         private Tuple<int,int> WriteSub(Stream stream, Tuple<int,int> freeBlocks)
         { 
             //Calculate if first block group is enough for the stream
-            int left = Convert.ToInt32(stream.Length - stream.Position-1);
+            int left = Convert.ToInt32(stream.Length - stream.Position);
             int nblocks = left % blockHandler.ContentSize > 0 ? left/blockHandler.ContentSize + 1 : left/blockHandler.ContentSize;
             //If tail space just write and return new tail index
             if(freeBlocks.Item2 == -1)
             {
-                blockHandler.Write(stream, 0,  nblocks, freeBlocks.Item1);
+                blockHandler.Write(stream, -1,  nblocks, freeBlocks.Item1);
                 return new Tuple<int, int>(freeBlocks.Item1 + nblocks, -1);
             }
             //If enough there is enough space in the sequence write and return any leftover
             if(freeBlocks.Item2 >= nblocks)
             {
-                blockHandler.Write(stream, 0,  nblocks, freeBlocks.Item1);
+                blockHandler.Write(stream, -1,  nblocks, freeBlocks.Item1);
                 return new Tuple<int,int>(freeBlocks.Item1 + nblocks, freeBlocks.Item2 - nblocks);
             }
             //If it's not enough get a new block group, write, link to the next one and 'recurse'

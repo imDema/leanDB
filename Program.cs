@@ -10,23 +10,50 @@ namespace leandb
     {
         static void Main(string[] args)
         {
+            DateTime timer = DateTime.Now;
             string path = Path.GetDirectoryName( System.Reflection.Assembly.GetEntryAssembly().Location);
-            using(BlockRW Block = new BlockRW(128, path))
+            using(BlockRW Block = new BlockRW(256, path))
             {
-                Console.WriteLine("Block handler initialized.");
+                Console.WriteLine($"Block handler initialized. {(DateTime.Now.Ticks - timer.Ticks) / 10000f} ms");
+                timer = DateTime.Now;
                 RecordFormatter Record = new RecordFormatter(Block, path);
-                Console.WriteLine("Record handler intitialized.");
+                Console.WriteLine($"Record handler intitialized. {(DateTime.Now.Ticks - timer.Ticks) / 10000f} ms");
+                timer = DateTime.Now;
                 ImageDB Database = new ImageDB(Record, path);
-                Console.WriteLine("Database initialized.");
-                Console.Write("\nReady to insert test images\nHow many? ");
+                Console.WriteLine($"Database initialized. {(DateTime.Now.Ticks - timer.Ticks) / 10000f} ms\n[{Database.IndexGuid.Count}] items currently stored\n");
+                Console.Write("Generate random images?[int] ");
                 int n = int.Parse(Console.ReadLine());
                 for (int i = 0; i<n; i++)
                 {
                     Database.Insert(GenerateTestImg());
                 }
-                Console.WriteLine("Added test images.");
+                //Console.WriteLine("Testing find by guid of 200 random guids");
+                //Random random = new Random();
+                //Guid[] guids = new Guid[200];
+                //for (int i = 0; i < guids.Length; i++)
+                //{
+                //    guids[i] = Database.IndexGuid.ToArray()[random.Next(0, Database.IndexGuid.Count)].Key;
+                //}
+                //timer = DateTime.Now;
+                //foreach (Guid g in guids)
+                //{
+                //    Database.Select(g);
+                //}
+                //Console.WriteLine($"Done {(DateTime.Now.Ticks - timer.Ticks) / 100f} ms");
+                Console.WriteLine($"[{Database.IndexGuid.Count}] items in database.\nTesting simple calculation for all items");
+                timer = DateTime.Now;
+                Image test;
+                double cdis = 0;
+                foreach(var item in Database.IndexGuid)
+                {
+                    test = Database.Select(item.Key);
+                    cdis += LowerBound(test.likes, test.dislikes);
+                }
+                Console.WriteLine($"Done {(DateTime.Now.Ticks - timer.Ticks) / 10000f}ms\nResult: average lower bound bayesian rating = {cdis / Database.IndexGuid.Count}");
+                timer = DateTime.Now;
                 Database.SaveData();
-                Console.WriteLine("Data Saved to files");
+                Console.WriteLine($"Data Saved to files {(DateTime.Now.Ticks - timer.Ticks) / 10000f}ms");
+                Console.ReadKey();
             }
         }
         static Image GenerateTestImg()
@@ -48,6 +75,19 @@ namespace leandb
                 img.tags.Add(tags[random.Next(0, tags.Length)]);
             }
             return img;
+        }
+
+        static double LowerBound(int pos, int neg)
+        {
+            int n = pos + neg + 5;
+            double z = 1.51d;
+            //double p = (double)pos/n;
+            //Bayesian
+            const double a = 4d, b = 1d;
+            double p = (pos + a) / (n + a + b);
+            //End Bayesian
+            if (n == 0) return 0;
+            return (p + (z * z) / (2 * n) - z * System.Math.Sqrt((p * (1 - p) + z * z / (4 * n)) / n)) / (1 + z * z / n);
         }
     }
 
