@@ -13,7 +13,13 @@ namespace leandb
             get{return blockList;}
             set{blockList = value;}
         }
-        readonly string blockListPath = "blocks.ldlb";
+        private readonly string location;
+
+        public string Location
+        {
+            get { return location; }
+        }
+
 
         IBlock blockHandler;
         public IBlock BlockStructure{get{return blockHandler;}}
@@ -48,7 +54,7 @@ namespace leandb
         {
             Tuple<int,int> pos = blockList.Pop();
             Tuple<int,int> blockRemains = WriteSub(stream,pos);
-            if(blockRemains.Item2 > 0)
+            if(blockRemains.Item2 != 0)
             {
                 blockList.Push(blockRemains);
             }
@@ -86,15 +92,14 @@ namespace leandb
             }
         }
 
-        private void InitBlockList(string path)
+        private void InitBlockList()
         {
-            string blPath = Path.Combine(path, blockListPath);
-            if(File.Exists(blPath))
+            if(File.Exists(location))
             {
-                using(FileStream fs = File.OpenRead(blPath))
+                using(FileStream fs = File.OpenRead(location))
                 {
                     BinaryFormatter bf = new BinaryFormatter();
-                    blockList = bf.Deserialize(fs) as Stack<Tuple<int,int>> ?? throw new ArgumentNullException($"File {blPath} does not contain a valid Indexer");
+                    blockList = bf.Deserialize(fs) as Stack<Tuple<int,int>> ?? throw new ArgumentNullException($"File {location} does not contain a valid Indexer");
                 }
             }
             else
@@ -103,11 +108,25 @@ namespace leandb
                 blockList.Push(new Tuple<int,int>(0,-1));
             }
         }
+        private void SaveBlockList()
+        {
+            BinaryFormatter bf = new BinaryFormatter();
+            using (FileStream fs = File.Open(location, FileMode.Create, FileAccess.Write))
+            {
+                bf.Serialize(fs, BlockList);
+            }
+        }
+
+        public void SaveData()
+        {
+            SaveBlockList();
+        }
 
         public RecordFormatter(IBlock blockHandler, string path)
         {
             this.blockHandler = blockHandler;
-            InitBlockList(path);
+            location = Path.Combine(path, "blocks.ldbl");
+            InitBlockList();
         }
     }
 }

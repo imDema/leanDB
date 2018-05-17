@@ -21,10 +21,10 @@ namespace leandb
         IRecord record;
         public IRecord RecordHandler { get  {return record;}}
 
-        private readonly string indexGuidPath = "iguid.ldi";
-        private readonly string indexUserPath = "iuser.ldi";
-        private readonly string indexDatePath = "idate.ldi";
-        private readonly string indexTagPath = "itag.ldi";
+        private readonly string GuidIndexLocation;
+        private readonly string UserIndexLocation;
+        private readonly string DateIndexLocation;
+        private readonly string TagIndexLocation;
 
         public void Remove(Image obj)
         {
@@ -82,6 +82,7 @@ namespace leandb
         public void Insert(Image obj)
         {
             int index;
+            if (indexGuid.ContainsKey(obj.Guid)) throw new Exception("Item already exists in database");
             //1. Serialize the object
             using(MemoryStream objStream = new MemoryStream())
             {
@@ -103,56 +104,93 @@ namespace leandb
             Remove(obj);
             Insert(obj);
         }
-        public ImageDB(IRecord record, string path)
-        {
-            this.location = path;
-            this.record = record;
-            InitIndexes(path);
-        }
 
-        private void InitIndexes(string path)
+        private void InitIndexes()
         {
             BinaryFormatter bf = new BinaryFormatter();
-            string pathGuid = Path.Combine(path, indexGuidPath);
-            if(File.Exists(pathGuid))
+            
+            if(File.Exists(GuidIndexLocation))
             {
-                using(FileStream fs = File.OpenRead(pathGuid))
+                using(FileStream fs = File.OpenRead(GuidIndexLocation))
                 {
-                    indexGuid = bf.Deserialize(fs) as Dictionary<Guid,int> ?? throw new ArgumentNullException($"File {pathGuid} does not contain a valid Indexer");
+                    indexGuid = bf.Deserialize(fs) as Dictionary<Guid,int> ?? throw new ArgumentNullException($"File {GuidIndexLocation} does not contain a valid Indexer");
                 }
             }
             else  indexGuid = new Dictionary<Guid,int>();
-
-
-            string pathUser = Path.Combine(path, indexUserPath);
-            if (File.Exists(pathUser))
+            
+            if (File.Exists(UserIndexLocation))
             {
-                using(FileStream fs = File.OpenRead(pathUser))
+                using(FileStream fs = File.OpenRead(UserIndexLocation))
                 {
-                    indexUser = bf.Deserialize(fs) as Indexer<string> ?? throw new ArgumentNullException($"File {pathUser} does not contain a valid Indexer");
+                    indexUser = bf.Deserialize(fs) as Indexer<string> ?? throw new ArgumentNullException($"File {UserIndexLocation} does not contain a valid Indexer");
                 }
             }
             else indexUser = new Indexer<string>();
 
-
-            string pathTag = Path.Combine(path, indexTagPath);
-            if (File.Exists(pathTag))
+            if (File.Exists(TagIndexLocation))
             {
-                using(FileStream fs = File.OpenRead(pathTag))
+                using(FileStream fs = File.OpenRead(TagIndexLocation))
                 {
-                    indexTag = bf.Deserialize(fs) as Indexer<string> ?? throw new ArgumentNullException($"File {pathTag} does not contain a valid Indexer");
+                    indexTag = bf.Deserialize(fs) as Indexer<string> ?? throw new ArgumentNullException($"File {TagIndexLocation} does not contain a valid Indexer");
                 }
             }
             else indexTag = new Indexer<string>();
+
+            //TODO IMPLEMENT INDEX DATE
+        }
+        private void WriteIndexes()
+        {
+            BinaryFormatter bf = new BinaryFormatter();
+            using (FileStream fs = File.Open(GuidIndexLocation, FileMode.Create, FileAccess.Write))
+            {
+                bf.Serialize(fs, IndexGuid);
+            }
+
+            using (FileStream fs = File.Open(UserIndexLocation, FileMode.Create, FileAccess.Write))
+            {
+                bf.Serialize(fs, indexUser);
+            }
+            
+            using (FileStream fs = File.Open(TagIndexLocation, FileMode.Create, FileAccess.Write))
+            {
+                bf.Serialize(fs, indexTag);
+            }
+            
+            //using (FileStream fs = File.Open(DateIndexLocation, FileMode.Create, FileAccess.Write))
+            //{
+            //    bf.Serialize(fs, indexDate);
+            //}
+        }
+
+        public void SaveData()
+        {
+            WriteIndexes();
+            record.SaveData();
+        }
+
+        public ImageDB(IRecord record, string path)
+        {
+            this.location = path;
+            this.record = record;
+            GuidIndexLocation = Path.Combine(location, "guid.ldbi");
+            UserIndexLocation = Path.Combine(location, "user.ldbi");
+            TagIndexLocation = Path.Combine(location, "tag.ldbi");
+            DateIndexLocation = Path.Combine(location, "date.ldbi");
+            InitIndexes();
         }
     }
 
-    class Indexer<T> : Dictionary<T,List<int>>
+    [Serializable]
+    class Indexer<T> : Dictionary<T,List<int>>, ISerializable
     {
         public void Add(T key, int value)
         {
+            List<int> list;
             //Leggi la lista esistente con chieve 'key', se è nulla list = nuova lista vuota
-            List<int> list = this[key] as List<int> ?? new List<int>();
+            if (this.ContainsKey(key))
+                list = this[key];
+            else
+                list = new List<int>();
 
             //Aggiungi alla lista e salva nella table
             list.Add(value);
@@ -182,6 +220,16 @@ namespace leandb
         public DateTime date;
         public List<string> tags;
 
+        public override string ToString()
+        {
+            string tagstring = "";
+            foreach (string s in tags)
+            {
+                tagstring += s + ",";
+            }
+            tagstring.TrimEnd(',');
+            return String.Format($"GUID:\t{guid.ToString()}\npos:\t{likes}\nneg:\t{dislikes}\nimgid:\t{imgid}\nuser:\t{user}\ndate:\t{date.ToString()}\ntags\t{tagstring}");
+        }
         /// <summary>
         /// Serialize this item to the output stream
         /// </summary>
@@ -189,7 +237,7 @@ namespace leandb
         public void Serialize(Stream outp)
         {
             outp.Position = 0;
-            using (BinaryWriter bw = new BinaryWriter(outp))
+            using (BinaryWriter bw = new BinaryWriter(outp,System.Text.Encoding.UTF8 ,true))
             {
                 bw.Write(guid.ToByteArray());
 
@@ -214,7 +262,7 @@ namespace leandb
         /// <param name="inpt">Stream to deserialize from</param>
         public void Deserialize(Stream inpt)
         {
-            using (BinaryReader br = new BinaryReader(inpt))
+            using (BinaryReader br = new BinaryReader(inpt, System.Text.Encoding.UTF8, true))
             {
                 guid = new Guid(br.ReadBytes(16)); //sizeof(Guid)
 

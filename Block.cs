@@ -26,7 +26,7 @@ namespace leandb
             byte[] buffer = new byte[ContentSize];
             using(MemoryStream ms = new MemoryStream(blockSize*cont))
             {
-                using (BinaryWriter bw = new BinaryWriter(ms))
+                using (BinaryWriter bw = new BinaryWriter(ms, System.Text.Encoding.UTF8, true))
                 {
                     while(cont > 0)
                     {
@@ -38,7 +38,7 @@ namespace leandb
                     }
                 }
                 Seek(index);
-                ms.CopyTo(dataStream);
+                ms.WriteTo(dataStream);
             }
         }
         /// <summary>
@@ -53,7 +53,7 @@ namespace leandb
             bool active;
             //Go to the index
             Seek(index);
-            using(BinaryReader br = new BinaryReader(dataStream))
+            using(BinaryReader br = new BinaryReader(dataStream,System.Text.Encoding.UTF8, true))
             {
                 //First read the header
                 next = br.ReadInt32();
@@ -84,7 +84,7 @@ namespace leandb
         {
             Seek(index);
             int next, cont;
-            using (BinaryReader br = new BinaryReader(dataStream))
+            using (BinaryReader br = new BinaryReader(dataStream, System.Text.Encoding.UTF8, true))
             {
                 next = br.ReadInt32();
                 cont = br.ReadInt32();

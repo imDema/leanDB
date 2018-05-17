@@ -12,9 +12,50 @@ namespace leandb
             string path = Path.GetDirectoryName( System.Reflection.Assembly.GetEntryAssembly().Location);
             using(BlockRW Block = new BlockRW(256, path))
             {
+                Console.WriteLine("Block handler initialized.");
                 RecordFormatter Record = new RecordFormatter(Block, path);
+                Console.WriteLine("Record handler intitialized.");
                 ImageDB Database = new ImageDB(Record, path);
-                Console.WriteLine("Initialized everything!");
+                Console.WriteLine("Database initialized.");
+
+                //Testimg
+                Image testimg0 = new Image()
+                {
+                    likes = 45,
+                    dislikes = 5,
+                    imgid = "telegram:img47ae5fd47be6b5c74",
+                    user = "a3f65da56bc",
+                    date = new DateTime(2018, 03, 24),
+                    tags = new List<string>(new string[] { "daniele_braga", "trifoglio" })
+                };
+
+                Image testimg1 = new Image()
+                {
+                    likes = 24,
+                    dislikes = 10,
+                    imgid = "telegram:img5658de4c5237d5fe5",
+                    user = "65f97cd68e9",
+                    date = new DateTime(2018, 03, 17),
+                    tags = new List<string>(new string[] { "luca_mauri", "algebra", "test" })
+                };
+
+                Image testimg2 = new Image()
+                {
+                    likes = 103,
+                    dislikes = 25,
+                    imgid = "telegram:img581f57d3c57abe754b",
+                    user = "589c67de6f4",
+                    date = new DateTime(2018, 05, 15),
+                    tags = new List<string>(new string[] { "gruosso_giambattista" })
+                };
+
+                Database.Insert(testimg0);
+                Database.Insert(testimg1);
+                Console.WriteLine("Added test images.");
+                Console.WriteLine("Finding image by GUID test:");
+                Console.WriteLine(Database.Select(testimg1.Guid).ToString());
+                Database.SaveData();
+                Console.WriteLine("Data Saved to files");
             }
         }
     }
@@ -43,6 +84,10 @@ namespace leandb
         /// </summary>
         /// <param name="guid">Guid of the item to delete</param>
         void Remove (Guid guid);
+        /// <summary>
+        /// Find the object with matching guid and update its properties
+        /// </summary>
+        /// <param name="obj">Object to update</param>
         void Update (T obj);
         /// <summary>
         /// Lookup an item in the indexes and read from record
@@ -50,6 +95,10 @@ namespace leandb
         /// <param name="guid">GUID of the item to retrieve</param>
         /// <returns></returns>
         T Select (Guid guid);
+        /// <summary>
+        /// Save index data to file
+        /// </summary>
+        void SaveData();
     }
     /// <summary>
     /// Handles block writing, reading and deletion
@@ -78,6 +127,10 @@ namespace leandb
         /// </summary>
         /// <param name="index"></param>
         void Free(int index);
+        /// <summary>
+        /// Save blocklist data
+        /// </summary>
+        void SaveData();
     }
     /// <summary>
     /// Blocks of data to be read fully, must be 128*n size for alignment purposes
