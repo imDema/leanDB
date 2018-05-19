@@ -98,40 +98,6 @@ namespace leandb
         void Deserialize(Stream inpt);
     }
     /// <summary>
-    /// Main database interface
-    /// </summary>
-    public interface ILeanDB<T>
-    {
-        string Location{get;}
-        IRecord RecordHandler{get;}
-        Dictionary<Guid,int> IndexGuid{get;}
-        /// <summary>
-        /// Use record to insert the object in the database and index it
-        /// </summary>
-        /// <param name="obj">Object to insert</param>
-        void Insert (T obj);
-        /// <summary>
-        /// Remove the object with matching guid from the database
-        /// </summary>
-        /// <param name="guid">Guid of the item to delete</param>
-        void Remove (Guid guid);
-        /// <summary>
-        /// Find the object with matching guid and update its properties
-        /// </summary>
-        /// <param name="obj">Object to update</param>
-        void Update (T obj);
-        /// <summary>
-        /// Lookup an item in the indexes and read from record
-        /// </summary>
-        /// <param name="guid">GUID of the item to retrieve</param>
-        /// <returns></returns>
-        T Select (Guid guid);
-        /// <summary>
-        /// Save index data to file
-        /// </summary>
-        void SaveData();
-    }
-    /// <summary>
     /// Handles block writing, reading and deletion
     /// </summary>
     public interface IRecord

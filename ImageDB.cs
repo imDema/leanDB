@@ -8,52 +8,19 @@ using System.Threading.Tasks;
 
 namespace leandb
 {
-    class ImageDB : ILeanDB<Image>
+    class ImageDB : Database<Image>
     {
-        Dictionary<Guid,int> indexGuid;
-        public Dictionary<Guid,int> IndexGuid {get => indexGuid; }
+        //Custom indexes
         IndexerInt indexUser = new IndexerInt();
         //TODO IMPLEMENT indexDate
         IndexerString indexTag = new IndexerString();
 
-        private string location;
-        public string Location {get => location;}
-        IRecord record;
-        public IRecord RecordHandler { get  {return record;}}
 
         private readonly string GuidIndexLocation;
         private readonly string UserIndexLocation;
         private readonly string DateIndexLocation;
         private readonly string TagIndexLocation;
 
-        public void Remove(Image obj)
-        {
-            Remove(obj.Guid);
-        }
-        public void Remove(Guid guid)
-        {
-            Image img = Select(guid);
-            int index = indexGuid[guid];
-            record.Free(index);            
-            indexGuid.Remove(guid);
-            indexUser.Remove(img.user, index);
-            foreach(string tag in img.tags)
-            {
-                indexTag.Remove(tag, index);
-            }
-        }
-
-        public Image Select(Guid guid)
-        {
-            int index = indexGuid[guid];
-            Image img;
-            using (MemoryStream ms = new MemoryStream())
-            {
-                record.Read(ms, index);
-                img = new Image(ms);
-            }
-            return img;
-        }
         public List<Image> SelectUser(int user)
         {
             List<int> indexes = indexUser[user];
@@ -79,45 +46,11 @@ namespace leandb
             return images;
         }
 
-        public void Insert(Image obj)
-        {
-            int index;
-            if (indexGuid.ContainsKey(obj.Guid)) throw new Exception("Item already exists in database");
-            //1. Serialize the object
-            using(MemoryStream objStream = new MemoryStream())
-            {
-                obj.Serialize(objStream);
-                //2. Write to the IRecord
-                index = record.Write(objStream);
-            }
-            //3. Index the item in the hashtables
-            indexGuid.Add(obj.Guid, index);
-            indexUser.Add(obj.user, index);
-            foreach (string tag in obj.tags)
-            {
-                indexTag.Add(tag, index);
-            }
-        }
-
-        public void Update(Image obj)
-        {
-            Remove(obj);
-            Insert(obj);
-        }
-
         private void InitIndexes()
         {
             BinaryFormatter bf = new BinaryFormatter();
             
-            //GUID
-            if(File.Exists(GuidIndexLocation))
-            {
-                using(FileStream fs = File.OpenRead(GuidIndexLocation))
-                {
-                    indexGuid = bf.Deserialize(fs) as Dictionary<Guid,int> ?? throw new ArgumentNullException($"File {GuidIndexLocation} does not contain a valid Indexer");
-                }
-            }
-            else  indexGuid = new Dictionary<Guid,int>();
+            
             
             //USER (INT)
             if (File.Exists(UserIndexLocation))
@@ -143,12 +76,6 @@ namespace leandb
         }
         private void WriteIndexes()
         {
-            BinaryFormatter bf = new BinaryFormatter();
-            using (FileStream fs = File.Open(GuidIndexLocation, FileMode.Create, FileAccess.Write))
-            {
-                bf.Serialize(fs, IndexGuid);
-            }
-
             using (FileStream fs = File.Open(UserIndexLocation, FileMode.Create, FileAccess.Write))
             {
                 indexUser.Serialize(fs);
@@ -163,12 +90,6 @@ namespace leandb
             //{
             //    bf.Serialize(fs, indexDate);
             //}
-        }
-
-        public void SaveData()
-        {
-            WriteIndexes();
-            record.SaveData();
         }
 
         public ImageDB(IRecord record, string path)
