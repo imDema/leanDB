@@ -58,7 +58,7 @@ namespace leandb
             int index = indexGuid[guid];
             record.Free(index);
             indexGuid.Remove(guid);
-            RemoveFromIndexes(obj);
+            RemoveFromIndexes(obj, index);
         }
         public void Remove (T obj) { Remove(obj.Guid); }
         /// <summary>
@@ -90,18 +90,17 @@ namespace leandb
         }
 
         /// <summary>
-        /// Remove the object from all custom indexes
-        /// </summary>
-        /// <param name="obj">object to remove from all custom indexes</param>
-        public abstract void RemoveFromIndexes(T obj);
-        /// <summary>
         /// Add the object to all custom indexes
         /// </summary>
         /// <param name="obj">Object to add to indexes</param>
         /// <param name="index">Index to assign</param>
         public abstract void AddToIndexes(T obj, int index);
+        /// <summary>
+        /// Remove the object from all custom indexes
+        /// </summary>
+        /// <param name="obj">object to remove from all custom indexes</param>
+        public abstract void RemoveFromIndexes(T obj, int index);
         
-
         /// <summary>
         /// Save index data to file
         /// </summary>

@@ -10,25 +10,21 @@ namespace leandb
 {
     class ImageDB : Database<Image>
     {
-        //Custom indexes
+            // Custom indexes
+        /// <summary>
+        /// Index by poster username
+        /// </summary>
         IndexerInt indexUser = new IndexerInt();
-        //TODO IMPLEMENT indexDate
-        IndexerString indexTag = new IndexerString();
-
-
-        private readonly string GuidIndexLocation;
-        private readonly string UserIndexLocation;
-        private readonly string DateIndexLocation;
-        private readonly string TagIndexLocation;
-
-        public List<Image> SelectUser(int user)
+        private readonly string FilenameIndexUser = "iuser.ldbi";
+        private string PathIndexUser { get => GetIndexPath(FilenameIndexUser); }
+        public List<Image> SelectByUser(int user)
         {
             List<int> indexes = indexUser[user];
             List<Image> images = new List<Image>();
             //Parallel
-            Parallel.ForEach(indexes,(index) =>
+            Parallel.ForEach(indexes, (index) =>
             {
-                using(MemoryStream ms = new MemoryStream())
+                using (MemoryStream ms = new MemoryStream())
                 {
                     record.Read(ms, index);
                     images.Add(new Image(ms));
@@ -46,16 +42,65 @@ namespace leandb
             return images;
         }
 
-        private void InitIndexes()
+        //TODO IMPLEMENT DATE INDEX
+        private readonly string FilenameIndexDate = "idate.ldbi";
+        private string PathIndexDate { get => GetIndexPath(FilenameIndexDate); }
+
+        /// <summary>
+        /// Index by image tags
+        /// </summary>
+        IndexerString indexTag = new IndexerString();
+        private readonly string FilenameIndexTag = "itag.ldbi";
+        private string PathIndexTag { get => GetIndexPath(FilenameIndexTag); }
+
+
+        //Abstract method implementation
+        public override void AddToIndexes(Image obj, int index)
+        {
+            indexUser.Add(obj.user, index);
+            //TODO IMPLEMENT INDEXDATE
+            foreach (string tag in obj.tags)
+            {
+                indexTag.Add(tag, index);
+            }
+        }
+
+        public override void RemoveFromIndexes(Image obj, int index)
+        {
+            indexUser.Remove(obj.user, index);
+            //TODO IMPLEMENT INDEXDATE
+            foreach (string tag in obj.tags)
+            {
+                indexTag.Remove(tag, index);
+            }
+        }
+
+        public override void SaveIndexes()
+        {
+            using (FileStream fs = File.Open(PathIndexUser, FileMode.Create, FileAccess.Write))
+            {
+                indexUser.Serialize(fs);
+            }
+
+            using (FileStream fs = File.Open(PathIndexTag, FileMode.Create, FileAccess.Write))
+            {
+                indexTag.Serialize(fs);
+            }
+
+            //TODO IMPLEMENT INDEXDATE
+            //using (FileStream fs = File.Open(DateIndexLocation, FileMode.Create, FileAccess.Write))
+            //{
+            //    bf.Serialize(fs, indexDate);
+            //}
+        }
+
+        public override void LoadIndexes()
         {
             BinaryFormatter bf = new BinaryFormatter();
-            
-            
-            
             //USER (INT)
-            if (File.Exists(UserIndexLocation))
+            if (File.Exists(PathIndexUser))
             {
-                using(FileStream fs = File.OpenRead(UserIndexLocation))
+                using (FileStream fs = File.OpenRead(PathIndexUser))
                 {
                     indexUser = new IndexerInt(fs);
                 }
@@ -63,9 +108,9 @@ namespace leandb
             else indexUser = new IndexerInt();
 
             //TAG (STRING)
-            if (File.Exists(TagIndexLocation))
+            if (File.Exists(PathIndexTag))
             {
-                using(FileStream fs = File.OpenRead(TagIndexLocation))
+                using (FileStream fs = File.OpenRead(PathIndexTag))
                 {
                     indexTag = new IndexerString(fs);
                 }
@@ -74,39 +119,24 @@ namespace leandb
 
             //TODO IMPLEMENT INDEX DATE
         }
-        private void WriteIndexes()
-        {
-            using (FileStream fs = File.Open(UserIndexLocation, FileMode.Create, FileAccess.Write))
-            {
-                indexUser.Serialize(fs);
-            }
-            
-            using (FileStream fs = File.Open(TagIndexLocation, FileMode.Create, FileAccess.Write))
-            {
-                indexTag.Serialize(fs);
-            }
-            
-            //using (FileStream fs = File.Open(DateIndexLocation, FileMode.Create, FileAccess.Write))
-            //{
-            //    bf.Serialize(fs, indexDate);
-            //}
-        }
 
+        //Constructors
         public ImageDB(IRecord record, string path)
         {
             this.location = path;
             this.record = record;
-            GuidIndexLocation = Path.Combine(location, "guid.ldbi");
-            UserIndexLocation = Path.Combine(location, "user.ldbi");
-            TagIndexLocation = Path.Combine(location, "tag.ldbi");
-            DateIndexLocation = Path.Combine(location, "date.ldbi");
-            InitIndexes();
+            LoadData();
         }
     }
 
     abstract class Indexer<T> : Dictionary<T,List<int>>
     {
-        public void Add(T key, int value)
+        /// <summary>
+        /// Add the index to the list at the key position or create new
+        /// </summary>
+        /// <param name="key">Property to look for</param>
+        /// <param name="index">Index to add</param>
+        public void Add(T key, int index)
         {
             List<int> list;
             //Leggi la lista esistente con chieve 'key', se è nulla list = nuova lista vuota
@@ -116,12 +146,18 @@ namespace leandb
                 list = new List<int>();
 
             //Aggiungi alla lista e salva nella table
-            list.Add(value);
+            list.Add(index);
             this[key] = list;
         }
-        public void Remove(T key, int value)
+        /// <summary>
+        /// Go to specified key and remove from list the specified index.
+        /// If the list is empty delete the dictionary entry
+        /// </summary>
+        /// <param name="key">Property to look for</param>
+        /// <param name="index">Index to delete</param>
+        public void Remove(T key, int index)
         {
-            this[key].Remove(value);
+            this[key].Remove(index);
             if(this[key].Count == 0)
             {
                 this.Remove(key);
