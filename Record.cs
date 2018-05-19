@@ -28,8 +28,7 @@ namespace leandb
         {
             do
             {
-                Tuple<int,int> freed;
-                index = BlockStructure.FreeBlocks(index, out freed);
+                index = BlockStructure.FreeBlocks(index, out Tuple<int, int> freed);
                 blockList.Push(freed);
             }
             while(index != 0);
