@@ -60,11 +60,9 @@ namespace leandb
             lock (blocklistLock)
             {
                 pos = blockList.Pop();
-            }
-            Tuple<int, int> blockRemains = WriteSub(stream, pos);
-            if (blockRemains.Item2 != 0)
-            {
-                lock(blocklistLock)
+
+                Tuple<int, int> blockRemains = WriteSub(stream, pos);
+                if (blockRemains.Item2 != 0)
                 {
                     blockList.Push(blockRemains);
                 }
@@ -99,10 +97,7 @@ namespace leandb
             else
             {
                 Tuple<int, int> next;
-                lock(blocklistLock)
-                {
-                    next = blockList.Pop();
-                }
+                next = blockList.Pop();
 
                 blockHandler.Write(stream, next.Item1, freeBlocks.Item2, freeBlocks.Item1);
                 return WriteSub(stream, next);

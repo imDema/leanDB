@@ -8,6 +8,7 @@ namespace leandb
 {
     abstract class Database<T> where T : ILeanDBObject, new()
     {
+        internal object indexLock = new object();
         internal string location;
         /// <summary>
         /// Directory where the indexes are to be stored
@@ -45,8 +46,11 @@ namespace leandb
                 index = record.Write(objStream);
             }
             //3. Index the item in the hashtables
-            indexGuid.Add(obj.Guid, index);
-            AddToIndexes(obj, index);
+            lock(indexLock)
+            {
+                indexGuid.Add(obj.Guid, index);
+                AddToIndexes(obj, index);
+            }
         }
         /// <summary>
         /// Commissions item deletion to RecordHandler

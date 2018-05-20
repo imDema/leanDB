@@ -35,10 +35,10 @@ namespace leandb
                             Console.Write("Generate random. How many?[int] ");
                             n = int.Parse(Console.ReadLine());
                             timer = DateTime.Now;
-                            for (int i = 0; i < n; i++)
+                            Parallel.For(0, n, i =>
                             {
                                 Database.Insert(GenerateTestImg());
-                            }
+                            });
                             break;
 
 
