@@ -54,7 +54,7 @@ namespace leandb
         /// <param name="guid">Guid of the item to delete</param>
         public void Remove(Guid guid)
         {
-            T obj = Select(guid);
+            T obj = Find(guid);
             int index = indexGuid[guid];
             record.Free(index);
             indexGuid.Remove(guid);
@@ -76,7 +76,7 @@ namespace leandb
         /// </summary>
         /// <param name="guid">GUID of the item to retrieve</param>
         /// <returns></returns>
-        public T Select(Guid guid)
+        public T Find(Guid guid)
         {
             int index = indexGuid[guid];
             T obj;
@@ -94,12 +94,12 @@ namespace leandb
         /// </summary>
         /// <param name="obj">Object to add to indexes</param>
         /// <param name="index">Index to assign</param>
-        public abstract void AddToIndexes(T obj, int index);
+        internal abstract void AddToIndexes(T obj, int index);
         /// <summary>
         /// Remove the object from all custom indexes
         /// </summary>
         /// <param name="obj">object to remove from all custom indexes</param>
-        public abstract void RemoveFromIndexes(T obj, int index);
+        internal abstract void RemoveFromIndexes(T obj, int index);
         
         /// <summary>
         /// Save index data to file

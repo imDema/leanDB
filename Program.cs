@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace leandb
 {
@@ -20,36 +21,63 @@ namespace leandb
                 Console.WriteLine($"Record handler intitialized. {(DateTime.Now.Ticks - timer.Ticks) / 10000f} ms");
                 timer = DateTime.Now;
                 ImageDB Database = new ImageDB(Record, path);
-                Console.WriteLine($"Database initialized. {(DateTime.Now.Ticks - timer.Ticks) / 10000f} ms\n[{Database.IndexGuid.Count}] items currently stored\n");
-                Console.Write("Generate random images?[int] ");
-                int n = int.Parse(Console.ReadLine());
-                for (int i = 0; i<n; i++)
+                Console.WriteLine($"Database initialized. {(DateTime.Now.Ticks - timer.Ticks) / 10000f} ms");
+                char c;
+                int n;
+                do
                 {
-                    Database.Insert(GenerateTestImg());
-                }
-                //Console.WriteLine("Testing find by guid of 200 random guids");
-                //Random random = new Random();
-                //Guid[] guids = new Guid[200];
-                //for (int i = 0; i < guids.Length; i++)
-                //{
-                //    guids[i] = Database.IndexGuid.ToArray()[random.Next(0, Database.IndexGuid.Count)].Key;
-                //}
-                //timer = DateTime.Now;
-                //foreach (Guid g in guids)
-                //{
-                //    Database.Select(g);
-                //}
-                //Console.WriteLine($"Done {(DateTime.Now.Ticks - timer.Ticks) / 100f} ms");
-                Console.WriteLine($"[{Database.IndexGuid.Count}] items in database.\nTesting simple calculation for all items");
-                timer = DateTime.Now;
-                Image test;
-                double cdis = 0;
-                foreach(var item in Database.IndexGuid)
-                {
-                    test = Database.Select(item.Key);
-                    cdis += LowerBound(test.likes, test.dislikes);
-                }
-                Console.WriteLine($"Done {(DateTime.Now.Ticks - timer.Ticks) / 10000f}ms\nResult: average lower bound bayesian rating = {cdis / Database.IndexGuid.Count}");
+                    Console.WriteLine($"\nLeanDB CLI test.\n usage:\n\tg : generate random items  \tc : do sample computation\n\tr : remove random items\tx : save and exit\n\n[{Database.IndexGuid.Count}] items currently stored\nLeanDB> ");
+                    c = Console.ReadKey().KeyChar;
+                    Console.Clear();
+                    switch (c)
+                    {
+                        case 'g':
+                            Console.Write("Generate random. How many?[int] ");
+                            n = int.Parse(Console.ReadLine());
+                            timer = DateTime.Now;
+                            for (int i = 0; i < n; i++)
+                            {
+                                Database.Insert(GenerateTestImg());
+                            }
+                            break;
+
+
+                        case 'c':
+                            Console.WriteLine("Testing sample computational work for every item in the database.");
+                            double cdis = 0d;
+                            long votesum = 0;
+                            timer = DateTime.Now;
+                            Parallel.ForEach(Database.IndexGuid, item =>
+                            //foreach (var item in Database.IndexGuid)
+                            {
+                                Image test = Database.Find(item.Key);
+                                cdis += LowerBound(test.likes, test.dislikes);
+                                votesum += test.likes - test.dislikes;
+                            }
+                            );
+                            Console.WriteLine($"Result:\n\taverage lower bound bayesian rating = {cdis / Database.IndexGuid.Count}\n\tvote sum = {votesum}");
+                            break;
+
+
+                        case 'r':
+                            Console.Write($"Delete random items. How many? ");
+                            n = int.Parse(Console.ReadLine());
+                            Random random = new Random();
+                            timer = DateTime.Now;
+                            DeleteImages(Database,random.Next(0,Database.indexGuid.Keys.Count - n),n);
+                            break;
+
+                        case 'x':
+                            Console.WriteLine("Terminating...");
+                            timer = DateTime.Now;
+                            break;
+
+                        default:
+                            Console.WriteLine("ERROR: Invalid input\n");
+                            break;
+                    }
+                    Console.WriteLine($"\t({(DateTime.Now.Ticks - timer.Ticks)/10000f}ms)");
+                } while (c != 'x');
                 timer = DateTime.Now;
                 Database.SaveData();
                 Console.WriteLine($"Data Saved to files {(DateTime.Now.Ticks - timer.Ticks) / 10000f}ms");
@@ -75,6 +103,17 @@ namespace leandb
                 img.tags.Add(tags[random.Next(0, tags.Length)]);
             }
             return img;
+        }
+
+        static void DeleteImages<T>(Database<T> db , int offset, int count) where T : ILeanDBObject, new()
+        {
+            var arr = db.IndexGuid.Keys.ToArray();
+            //Parallel.For(offset, offset + count, i => { 
+            for(int i = offset; i < count + offset; i++)
+            {
+                db.Remove(arr[i]);
+            }
+            //});
         }
 
         static double LowerBound(int pos, int neg)

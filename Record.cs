@@ -7,6 +7,8 @@ namespace leandb
 {
     public class RecordFormatter : IRecord
     {
+        private object writeLock = new object();
+
         private Stack<Tuple<int,int>> blockList;
         public Stack<Tuple<int,int>> BlockList
         {
@@ -31,7 +33,7 @@ namespace leandb
                 index = BlockStructure.FreeBlocks(index, out Tuple<int, int> freed);
                 blockList.Push(freed);
             }
-            while(index != 0);
+            while(index != -1);
         }
 
         public void Read(Stream outp, int index)
@@ -51,13 +53,16 @@ namespace leandb
         /// <param name="stream"></param>
         public int Write(Stream stream)
         {
-            Tuple<int,int> pos = blockList.Pop();
-            Tuple<int,int> blockRemains = WriteSub(stream,pos);
-            if(blockRemains.Item2 != 0)
+            lock (writeLock)
             {
-                blockList.Push(blockRemains);
+                Tuple<int, int> pos = blockList.Pop();
+                Tuple<int, int> blockRemains = WriteSub(stream, pos);
+                if (blockRemains.Item2 != 0)
+                {
+                    blockList.Push(blockRemains);
+                }
+                return pos.Item1;
             }
-            return pos.Item1;
         }
         /// <summary>
         /// Recursively write on first free group until all the data has been written

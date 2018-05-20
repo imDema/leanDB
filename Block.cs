@@ -5,6 +5,7 @@ namespace leandb
 
     public class BlockRW : IBlock, IDisposable
     {
+        object ioLock = new object();
         readonly string dataPath = "data.ldb";
         readonly int blockSize;
         public int BlockSize{get => blockSize;}
@@ -37,8 +38,11 @@ namespace leandb
                         bw.Write(buffer);
                     }
                 }
-                Seek(index);
-                ms.WriteTo(dataStream);
+                lock(ioLock)
+                {
+                    Seek(index);
+                    ms.WriteTo(dataStream);
+                }
             }
         }
         /// <summary>
@@ -52,25 +56,28 @@ namespace leandb
             int next, cont;
             bool active;
             //Go to the index
-            Seek(index);
-            using(BinaryReader br = new BinaryReader(dataStream,System.Text.Encoding.UTF8, true))
+            lock (ioLock)
             {
-                //First read the header
-                next = br.ReadInt32();
-                cont = br.ReadInt32();
-                active = br.ReadBoolean();
-            }
+                Seek(index);
+                using (BinaryReader br = new BinaryReader(dataStream, System.Text.Encoding.UTF8, true))
+                {
+                    //First read the header
+                    next = br.ReadInt32();
+                    cont = br.ReadInt32();
+                    active = br.ReadBoolean();
+                }
 
-            //If landed on inactive space exit
-            if(!active) throw new Exception($"While reading at index {index} (DataStream.Position = {dataStream.Position}) landed on inactive block!");
+                //If landed on inactive space exit
+                if (!active) throw new Exception($"While reading at index {index} (DataStream.Position = {dataStream.Position}) landed on inactive block!");
 
-            //Copy the content of the first block group one at a time
-            byte[] buffer = new byte[ContentSize];
-            for (int i = 0; i < cont; i++)
-            {
-                dataStream.Read(buffer,0,ContentSize);
-                outp.Write(buffer,0,ContentSize);
-                dataStream.Position += HeaderSize;
+                //Copy the content of the first block group one at a time
+                byte[] buffer = new byte[ContentSize];
+                for (int i = 0; i < cont; i++)
+                {
+                    dataStream.Read(buffer, 0, ContentSize);
+                    outp.Write(buffer, 0, ContentSize);
+                    dataStream.Position += HeaderSize;
+                }
             }
             return next;
         }
@@ -82,19 +89,22 @@ namespace leandb
         /// <returns></returns>
         public int FreeBlocks(int index, out Tuple<int,int> freed)
         {
-            Seek(index);
             int next, cont;
-            using (BinaryReader br = new BinaryReader(dataStream, System.Text.Encoding.UTF8, true))
+            lock (ioLock)
             {
-                next = br.ReadInt32();
-                cont = br.ReadInt32();
-            }
-            Seek(index);
-            byte[] deletebuffer = new byte[HeaderSize];
-            for(int i = 0; i<cont; i++)
-            {
-                dataStream.Write(deletebuffer,0,HeaderSize);
-                dataStream.Position += ContentSize;
+                Seek(index);
+                using (BinaryReader br = new BinaryReader(dataStream, System.Text.Encoding.UTF8, true))
+                {
+                    next = br.ReadInt32();
+                    cont = br.ReadInt32();
+                }
+                Seek(index);
+                byte[] deletebuffer = new byte[HeaderSize];
+                for (int i = 0; i < cont; i++)
+                {
+                    dataStream.Write(deletebuffer, 0, HeaderSize);
+                    dataStream.Position += ContentSize;
+                }
             }
             freed = new Tuple<int,int>(index, cont);
             return next;

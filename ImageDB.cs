@@ -17,7 +17,7 @@ namespace leandb
         IndexerInt indexUser = new IndexerInt();
         private readonly string FilenameIndexUser = "iuser.ldbi";
         private string PathIndexUser { get => GetIndexPath(FilenameIndexUser); }
-        public List<Image> SelectByUser(int user)
+        public List<Image> FindByUser(int user)
         {
             List<int> indexes = indexUser[user];
             List<Image> images = new List<Image>();
@@ -55,7 +55,7 @@ namespace leandb
 
 
         //Abstract method implementation
-        public override void AddToIndexes(Image obj, int index)
+        internal override void AddToIndexes(Image obj, int index)
         {
             indexUser.Add(obj.user, index);
             //TODO IMPLEMENT INDEXDATE
@@ -65,7 +65,7 @@ namespace leandb
             }
         }
 
-        public override void RemoveFromIndexes(Image obj, int index)
+        internal override void RemoveFromIndexes(Image obj, int index)
         {
             indexUser.Remove(obj.user, index);
             //TODO IMPLEMENT INDEXDATE
