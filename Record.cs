@@ -7,7 +7,7 @@ namespace leandb
 {
     public class RecordFormatter : IRecord
     {
-        private object writeLock = new object();
+        private object blocklistLock = new object();
 
         private Stack<Tuple<int,int>> blockList;
         public Stack<Tuple<int,int>> BlockList
@@ -31,7 +31,10 @@ namespace leandb
             do
             {
                 index = BlockStructure.FreeBlocks(index, out Tuple<int, int> freed);
-                blockList.Push(freed);
+                lock(blocklistLock)
+                {
+                    blockList.Push(freed);
+                }
             }
             while(index != -1);
         }
@@ -53,16 +56,21 @@ namespace leandb
         /// <param name="stream"></param>
         public int Write(Stream stream)
         {
-            lock (writeLock)
+            Tuple<int, int> pos;
+            lock (blocklistLock)
             {
-                Tuple<int, int> pos = blockList.Pop();
-                Tuple<int, int> blockRemains = WriteSub(stream, pos);
-                if (blockRemains.Item2 != 0)
+                pos = blockList.Pop();
+            }
+            Tuple<int, int> blockRemains = WriteSub(stream, pos);
+            if (blockRemains.Item2 != 0)
+            {
+                lock(blocklistLock)
                 {
                     blockList.Push(blockRemains);
                 }
-                return pos.Item1;
             }
+            return pos.Item1;
+            
         }
         /// <summary>
         /// Recursively write on first free group until all the data has been written
@@ -90,7 +98,12 @@ namespace leandb
             //If it's not enough get a new block group, write, link to the next one and 'recurse'
             else
             {
-                Tuple<int,int> next = blockList.Pop();
+                Tuple<int, int> next;
+                lock(blocklistLock)
+                {
+                    next = blockList.Pop();
+                }
+
                 blockHandler.Write(stream, next.Item1, freeBlocks.Item2, freeBlocks.Item1);
                 return WriteSub(stream, next);
             }

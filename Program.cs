@@ -108,12 +108,12 @@ namespace leandb
         static void DeleteImages<T>(Database<T> db , int offset, int count) where T : ILeanDBObject, new()
         {
             var arr = db.IndexGuid.Keys.ToArray();
-            //Parallel.For(offset, offset + count, i => { 
-            for(int i = offset; i < count + offset; i++)
+            Parallel.For(offset, offset + count, i =>
+            //for(int i = offset; i < count + offset; i++)
             {
                 db.Remove(arr[i]);
-            }
-            //});
+            //}
+            });
         }
 
         static double LowerBound(int pos, int neg)
