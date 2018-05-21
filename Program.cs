@@ -15,6 +15,7 @@ namespace leandb
             string path = Path.GetDirectoryName( System.Reflection.Assembly.GetEntryAssembly().Location);
             using(BlockRW Block = new BlockRW(256, path))
             {
+                Block.LoadToRam();
                 Console.WriteLine($"Block handler initialized. {(DateTime.Now.Ticks - timer.Ticks) / 10000f} ms");
                 timer = DateTime.Now;
                 RecordFormatter Record = new RecordFormatter(Block, path);
@@ -43,19 +44,22 @@ namespace leandb
 
 
                         case 'c':
-                            Console.WriteLine("Testing sample computational work for every item in the database.");
-                            double cdis = 0d;
-                            long votesum = 0;
+                            Console.WriteLine("Testing sample computational work for every item in the database. Sorting by rating");
                             timer = DateTime.Now;
+                            List<Tuple<double,Guid>> ratingmap = new List<Tuple<double,Guid>>();
                             Parallel.ForEach(Database.IndexGuid, item =>
                             //foreach (var item in Database.IndexGuid)
                             {
                                 Image test = Database.Find(item.Key);
-                                cdis += LowerBound(test.likes, test.dislikes);
-                                votesum += test.likes - test.dislikes;
+                                Tuple<double,Guid> imgrating = new Tuple<double,Guid>(LowerBound(test.likes,test.dislikes),test.Guid);
+                                ratingmap.Add(imgrating);
                             }
                             );
-                            Console.WriteLine($"Result:\n\taverage lower bound bayesian rating = {cdis / Database.IndexGuid.Count}\n\tvote sum = {votesum}");
+                            ratingmap.Sort();
+                            for(int i = 0; i<10; i++)
+                            {
+                                System.Console.WriteLine(Database.Find(ratingmap[ratingmap.Count-1-i].Item2).ToString() + '\n'); 
+                            }
                             break;
 
 
@@ -80,8 +84,8 @@ namespace leandb
                 } while (c != 'x');
                 timer = DateTime.Now;
                 Database.SaveData();
+                Block.CommitChangesToDisk(Database.Location);
                 Console.WriteLine($"Data Saved to files {(DateTime.Now.Ticks - timer.Ticks) / 10000f}ms");
-                Console.ReadKey();
             }
         }
         static Image GenerateTestImg()

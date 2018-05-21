@@ -119,6 +119,22 @@ namespace leandb
         {
             dataStream.Dispose();
         }
+        public void LoadToRam()
+        {
+            MemoryStream ms = new MemoryStream();
+            dataStream.Position = 0;
+            dataStream.CopyTo(ms);
+            dataStream.Dispose();
+            dataStream = ms;
+        }
+        public void CommitChangesToDisk(string path)
+        {
+            using(FileStream fs = File.Open(Path.Combine(path, dataPath),FileMode.OpenOrCreate,FileAccess.ReadWrite))
+            {
+                dataStream.Position = 0;
+                dataStream.CopyTo(fs);
+            }
+        }
 
         public BlockRW(int _blockSize, string path)
         {
